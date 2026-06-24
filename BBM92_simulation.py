@@ -12,14 +12,6 @@ import sequence.topology.qkd_topo as qkdtp
 from sequence.kernel.timeline import Timeline
 
 
-class Counter:
-    def __init__(self):
-        self.count = 0
-
-    def trigger(self, detector, info):
-        self.count += 1
-
-
 
 class BBM92_receiver(nd.Node):
   #class that represents a BBM92 receiver
@@ -45,8 +37,6 @@ class BBM92_receiver(nd.Node):
     PBS.add_receiver(det_2)
 
 
-#  def modulus(self):
-#    return sqrt(pow(self.re,2)+pow(self.im,2))
 
 
 class BBM92_SPDC_source(nd.Node):
@@ -56,7 +46,7 @@ class BBM92_SPDC_source(nd.Node):
     super().__init__(name, tl)
     self.name=name
     SPDC_name= name +" SPDC_source"
-    SPDC_source = ls.SPDCSource(name=SPDC_name, timeline=tl, wavelengths=[1550,1550], frequency= freq, mean_photon_num=0.1, encoding_type={'bases': None, 'name': 'fock'}, phase_error=0.1)
+    SPDC_source = ls.SPDCSource(name=SPDC_name, timeline=tl, wavelengths=[1550,1550], frequency= freq, mean_photon_num=0.1, encoding_type={'bases': [((1 + 0j, 0j), (0j, 1 + 0j)), ((0.7071067811865476 + 0j, 0.7071067811865476 + 0j), (-0.7071067811865476 + 0j, 0.7071067811865476 + 0j))], 'name': 'polarization'}, phase_error=0.1)
     self.add_component(SPDC_source)
     print("BBM92_SPDC_source named: ",  self.name ," has been set")
 
@@ -74,9 +64,7 @@ def main():
   Alice = BBM92_receiver(name="Alice")
   Bob = BBM92_receiver(name="Bob")
   Charlie = BBM92_SPDC_source(name="Charlie")
-  Alice.set_seed(0)
-  Bob.set_seed(1)
-  Charlie.set_seed(2)
+
 
 
 #### Defining channels and connecting the nodes
@@ -89,6 +77,11 @@ def main():
   cc1 = optch.ClassicalChannel("cc1", tl, distance=distance)
   cc0.set_ends(Alice, Bob.name)
   cc1.set_ends(Bob, Alice.name)
+
+
+
+
+
 
 if __name__ == "__main__":
   main()
