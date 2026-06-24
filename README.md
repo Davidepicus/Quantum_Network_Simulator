@@ -9,5 +9,5 @@ The link to the documentation is: https://sequence-rtd-tutorial.readthedocs.io/s
 # Files
 
 There are three files as of now in this repository "BB84_test.py" is a test of a simulation of BB84 protocol between two links. This file is a copy downloaded from the Sequence directory. 
-The second file is "BBM92_simulation.py" This is an attempt to simulate a network which uses a custom BBM92 protocol with custom receivers and emitters. It does not work yet but i hope the topology will be ready soon
+The second file is "BBM92_simulation.py" This is an attempt to simulate a network which uses a custom BBM92 protocol with custom receivers and emitters. It does not work yet but I hope the topology will be ready soon
 
