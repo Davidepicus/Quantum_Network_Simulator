@@ -12,6 +12,24 @@ import sequence.topology.qkd_topo as qkdtp
 from sequence.kernel.timeline import Timeline
 from sequence.kernel.event import Event
 from sequence.kernel.process import Process
+from sequence.components.memory import Memory
+
+
+
+
+################# Class that represents the counters for the photon detectors #########################
+
+
+class det_counter:
+  def __init__(self):
+    self.count = 0
+    self.time = 0
+
+  def trigger(self, detector, info):
+    self.count += 1
+    self.time = info['time']
+
+
 
 ################# Class that represents a BBM92 receiver ################################
 class BBM92_receiver(nd.Node):
@@ -31,13 +49,19 @@ class BBM92_receiver(nd.Node):
     PBS_name= name + "Polarizing_Beam_splitter"
     self.PBS=BS.BeamSplitter(name=PBS_name, timeline=tl, fidelity=0.98)
     self.add_component(self.PBS)
-    self.PBS.set_basis_list(basis_list=[0,1], start_time=0, frequency=0)
+    self.PBS.set_basis_list(basis_list=[0,1], start_time=0, frequency=5000)
 
     print("BBM92_receiver named: ",  self.name ," has been set")
+
     ######## Connecting the hardware ##################
     self.set_first_component(self.PBS)
     self.PBS.add_receiver(self.det_1)
     self.PBS.add_receiver(self.det_2)
+  
+    ######### Adding a counter #############
+    self.counter_1= det_counter()
+    self.det_1.attach(self.counter_1)
+
 
   def get_counts_D1(self):
     return self.det_1.photon_counter
@@ -58,9 +82,23 @@ class BBM92_SPDC_source(nd.Node):
     self.add_component(self.SPDC_source)
     print("BBM92_SPDC_source named: ",  self.name ," has been set")
 
+    ######### Defining memory ##############
+    memory_name = name + ".memory"
+    memory = Memory(memory_name, tl, fidelity=1, frequency=0, efficiency=1, coherence_time=0, wavelength=500)
+    self.add_component(memory)
+    memory.add_receiver(self)
+
+
+
+  def get_photon(self, photon, **kwargs):
+        self.send_qubit(kwargs['dst'], photon)
+
+
+
   def emit_photon(self):
          c = 1 / mt.sqrt(2)
          self.SPDC_source.emit([[c+0j,c+0j],[c+0j,-c+0j]])
+
 
 
 ##################### main program definition ############################
@@ -76,7 +114,9 @@ def main():
   Alice = BBM92_receiver(name="Alice")
   Bob = BBM92_receiver(name="Bob")
   Charlie = BBM92_SPDC_source(name="Charlie")
-
+  Alice.set_seed(0)
+  Bob.set_seed(1)
+  Charlie.set_seed(0)
 
 
 #### Defining channels and connecting the nodes
@@ -90,16 +130,19 @@ def main():
   cc0.set_ends(Alice, Bob.name)
   cc1.set_ends(Bob, Alice.name)
 
+#  memories = Charlie.get_components_by_type(Memory)
+#  memory = memories[0]
+#  memory.update_state([complex(0), complex(1)])
 
-  for i in range (1000):
-    Charlie.emit_photon()
+  process = Process("Charlie", Charlie.emit_photon(), "Charlie")
+  event = Event(0, process)
+  tl.schedule(event)
 
-  print("Counter of alice D1 is: ", Alice.get_counts_D1())
-  print("Counter of alice D2 is: ", Alice.get_counts_D1())
+  tl.init()
+  tl.run()
 
-  print("Counter of Bob D1 is: ", Bob.get_counts_D1())
-  print("Counter of Bob D2 is: ", Bob.get_counts_D1())
-
+  print("detection count of Alice: {}".format(Alice.counter.count))
+  print("detection time of Alice: {}".format(Alice.counter.time))
 
 if __name__ == "__main__":
   main()
