@@ -127,7 +127,7 @@ class BBM92_SPDC_source(nd.Node):
 
 def main():
 
-  runtime = 2e12
+  runtime = 4e12
   distance = 1e3
   tl = Timeline(runtime)
   tl.show_progress = True
@@ -157,7 +157,7 @@ def main():
 
 
   process = Process(Charlie, "emit_photon", [])
-  event = Event(3, process)
+  event = Event(0, process)
   tl.schedule(event)
 
   tl.init()
