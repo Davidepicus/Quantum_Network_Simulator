@@ -38,30 +38,56 @@ class BBM92_receiver(nd.Node):
     ###### detector definition ##############
     super().__init__(name, tl)
     self.name=name
-    dect0_name= name+ "det0"
     dect1_name= name+ "det1"
-    self.det_1= det.Detector(name= dect0_name, timeline=tl, efficiency=det_eff, dark_count=dark_counts, count_rate=count_rate_max)
-    self.det_2= det.Detector(name= dect1_name, timeline=tl, efficiency=det_eff, dark_count=dark_counts, count_rate=count_rate_max)
+    dect2_name= name+ "det2"
+    dect3_name= name+ "det3"
+    dect4_name= name+ "det4"
+    self.det_1= det.Detector(name= dect1_name, timeline=tl, efficiency=det_eff, dark_count=dark_counts, count_rate=count_rate_max)
+    self.det_2= det.Detector(name= dect2_name, timeline=tl, efficiency=det_eff, dark_count=dark_counts, count_rate=count_rate_max)
+    self.det_3= det.Detector(name= dect3_name, timeline=tl, efficiency=det_eff, dark_count=dark_counts, count_rate=count_rate_max)
+    self.det_4= det.Detector(name= dect4_name, timeline=tl, efficiency=det_eff, dark_count=dark_counts, count_rate=count_rate_max)
     self.add_component(self.det_1)
     self.add_component(self.det_2)
+    self.add_component(self.det_3)
+    self.add_component(self.det_4)
 
-    ######### Polarization beam splitter definition ############
-    PBS_name= name + "Polarizing_Beam_splitter"
-    self.PBS=BS.BeamSplitter(name=PBS_name, timeline=tl, fidelity=0.98)
-    self.add_component(self.PBS)
-    self.PBS.set_basis_list(basis_list=[0,1], start_time=0, frequency=5000)
+    ######## Beam splitter definition ###############
+    bs_name= name+ "initial_beam_splitter"
+    self.bs=BS.BeamSplitter(name=bs_name, timeline=tl, fidelity=0.99)
+    self.add_component(self.bs)
+
+    ######### Polarization beam splitter definition, measurement on the Z basis ############
+    PBSA_name= name + "Polarizing_Beam_splitter_A"
+    self.PBSA=BS.BeamSplitter(name=PBSA_name, timeline=tl, fidelity=0.99)
+    self.add_component(self.PBSA)
+    self.PBSA.set_basis_list(basis_list=[0], start_time=0, frequency=0)
+
+    ######### Polarization beam splitter definition, measurement on the Z basis ############
+    PBSB_name= name + "Polarizing_Beam_splitter_B"
+    self.PBSB=BS.BeamSplitter(name=PBSB_name, timeline=tl, fidelity=0.99)
+    self.add_component(self.PBSB)
+    self.PBSB.set_basis_list(basis_list=[1], start_time=0, frequency=0)
 
     print("BBM92_receiver named: ",  self.name ," has been set")
 
     ######## Connecting the hardware ##################
-    self.set_first_component(self.PBS)
-    self.PBS.add_receiver(self.det_1)
-    self.PBS.add_receiver(self.det_2)
+    self.set_first_component(self.bs)
+    self.bs.add_receiver(self.PBSA)
+    self.bs.add_receiver(self.PBSA)
+    self.PBSA.add_receiver(self.det_1)
+    self.PBSA.add_receiver(self.det_2)
+    self.PBSB.add_receiver(self.det_3)
+    self.PBSB.add_receiver(self.det_4)
   
     ######### Adding a counter #############
+    self.counter_0= det_counter()
+    self.det_1.attach(self.counter_0)
     self.counter_1= det_counter()
-    self.det_1.attach(self.counter_1)
-
+    self.det_2.attach(self.counter_1)
+    self.counter_plus= det_counter()
+    self.det_3.attach(self.counter_plus)
+    self.counter_minus= det_counter()
+    self.det_4.attach(self.counter_minus)
 
   def get_counts_D1(self):
     return self.det_1.photon_counter
@@ -73,26 +99,22 @@ class BBM92_receiver(nd.Node):
 
 class BBM92_SPDC_source(nd.Node):
   
-  def __init__(self,name="unnamed", freq=10000000.0, tl = Timeline(2e10)):
+  def __init__(self,name="unnamed", freq=100000.0, tl = Timeline(2e10), receiver_1=None, receiver_2=None):
   ###### source definition ##############
     super().__init__(name, tl)
     self.name=name
     SPDC_name= name +" SPDC_source"
     self.SPDC_source = ls.SPDCSource(name=SPDC_name, timeline=tl, wavelengths=[1550,1550], frequency= freq, mean_photon_num=0.1, encoding_type={'bases': [((1 + 0j, 0j), (0j, 1 + 0j)), ((0.7071067811865476 + 0j, 0.7071067811865476 + 0j), (-0.7071067811865476 + 0j, 0.7071067811865476 + 0j))], 'name': 'polarization'}, phase_error=0.1)
     self.add_component(self.SPDC_source)
+    self.SPDC_source.add_receiver(receiver_1)
+    self.SPDC_source.add_receiver(receiver_2)
     print("BBM92_SPDC_source named: ",  self.name ," has been set")
 
-    ######### Defining memory ##############
-    memory_name = name + ".memory"
-    memory = Memory(memory_name, tl, fidelity=1, frequency=0, efficiency=1, coherence_time=0, wavelength=500)
-    self.add_component(memory)
-    memory.add_receiver(self)
 
 
 
-  def get_photon(self, photon, **kwargs):
-        self.send_qubit(kwargs['dst'], photon)
-
+#  def get_photon(self, photon, **kwargs):
+#        self.send_qubit(kwargs['dst'], photon)
 
 
   def emit_photon(self):
@@ -105,18 +127,19 @@ class BBM92_SPDC_source(nd.Node):
 
 def main():
 
-  runtime = 2e10
+  runtime = 2e12
   distance = 1e3
   tl = Timeline(runtime)
   tl.show_progress = True
 
 #### Defining nodes, Alice and Bob (the receivers) and Charlie (the sender)
-  Alice = BBM92_receiver(name="Alice")
-  Bob = BBM92_receiver(name="Bob")
-  Charlie = BBM92_SPDC_source(name="Charlie")
+  Alice = BBM92_receiver(name="Alice", tl=tl)
+  Bob = BBM92_receiver(name="Bob", tl=tl)
+  Charlie = BBM92_SPDC_source(name="Charlie", tl=tl, receiver_1=Alice, receiver_2=Bob)
   Alice.set_seed(0)
   Bob.set_seed(1)
   Charlie.set_seed(0)
+
 
 
 #### Defining channels and connecting the nodes
@@ -130,19 +153,29 @@ def main():
   cc0.set_ends(Alice, Bob.name)
   cc1.set_ends(Bob, Alice.name)
 
-#  memories = Charlie.get_components_by_type(Memory)
-#  memory = memories[0]
-#  memory.update_state([complex(0), complex(1)])
 
-  process = Process("Charlie", Charlie.emit_photon(), "Charlie")
-  event = Event(0, process)
+
+
+  process = Process(Charlie, "emit_photon", [])
+  event = Event(3, process)
   tl.schedule(event)
 
   tl.init()
   tl.run()
 
-  print("detection count of Alice: {}".format(Alice.counter.count))
-  print("detection time of Alice: {}".format(Alice.counter.time))
+
+  print("detection count of Alice: {}".format(Alice.counter_plus.count))
+
+
+  print("detection count of Bob: {}".format(Bob.counter_plus.count))
+
+
+#  print("detection count of Alice: {}".format(Alice.counter_1.count))
+#  print("detection time of Alice: {}".format(Alice.counter_1.time))
+
+#  print("detection count of Bob: {}".format(Bob.counter_1.count))
+#  print("detection time of Bob: {}".format(Bob.counter_1.time))
+
 
 if __name__ == "__main__":
   main()
