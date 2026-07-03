@@ -14,9 +14,9 @@ Il secondo file, "BBM92_simulation.py" simula un protocollo BBM92 con dei nodi d
 Vi sono due classi che costituiscono i due tipi di nodi necessari per il protocollo BBM92.
 "BBM92_SPDC_source" è la classe che contiene l'emettitore di fotoni, in questo caso un cristallo SPDC eccitato con una certa frequenza.
 
-"BBM92_receiver" è invece la classe che simula un ricevitore BBM92. Il ricevitore è costituito fa un beam splitter 50/50 2X1, due polarizing meam splitter che misurano la polarizzazione dei fotoni nelle diverse (base {H,V} e base {+.-}), e 4 detector.
+"BBM92_receiver" è invece la classe che simula un ricevitore BBM92. Il ricevitore è costituito fa un beam splitter 50/50 2X1, due polarizing beam splitter che misurano la polarizzazione dei fotoni nelle diverse (base {H,V} e base {+.-}), e 4 detector.
 
 
 # Stato della Simulazione
 
-Per ora le due classi sono funzionanti e connesse. I fotoni vengono emessi ed arrivano sui detector. Manca ancora la parte di post processing classica
+Per ora le due classi sono funzionanti e connesse. I fotoni vengono emessi ed arrivano sui detector. Manca ancora la parte di post processing classica, ma non dovrebbe essere troppo complicata

@@ -24,10 +24,12 @@ class det_counter:
   def __init__(self):
     self.count = 0
     self.time = 0
+    self.det_time=[]
 
   def trigger(self, detector, info):
     self.count += 1
     self.time = info['time']
+    self.det_time.append(self.time)
 
 
 
@@ -68,8 +70,6 @@ class BBM92_receiver(nd.Node):
     self.add_component(self.PBSB)
     self.PBSB.set_basis_list(basis_list=[1], start_time=0, frequency=0)
 
-    print("BBM92_receiver named: ",  self.name ," has been set")
-
     ######## Connecting the hardware ##################
     self.set_first_component(self.bs)
     self.bs.add_receiver(self.PBSA)
@@ -89,11 +89,14 @@ class BBM92_receiver(nd.Node):
     self.counter_minus= det_counter()
     self.det_4.attach(self.counter_minus)
 
-  def get_counts_D1(self):
-    return self.det_1.photon_counter
+    ######### Defining list of detected basis ##########
+    
 
-  def get_counts_D2(self):
-    return self.det_2.photon_counter
+    print("BBM92_receiver named: ",  self.name ," has been set")
+
+#  def emission_flag(self):
+#    print(self.name, "has been informed of an emission event")
+
 
 ############### class that represents a BBM92 source ###################################
 
@@ -106,20 +109,20 @@ class BBM92_SPDC_source(nd.Node):
     SPDC_name= name +" SPDC_source"
     self.SPDC_source = ls.SPDCSource(name=SPDC_name, timeline=tl, wavelengths=[1550,1550], frequency= freq, mean_photon_num=0.1, encoding_type={'bases': [((1 + 0j, 0j), (0j, 1 + 0j)), ((0.7071067811865476 + 0j, 0.7071067811865476 + 0j), (-0.7071067811865476 + 0j, 0.7071067811865476 + 0j))], 'name': 'polarization'}, phase_error=0.1)
     self.add_component(self.SPDC_source)
-    self.SPDC_source.add_receiver(receiver_1)
-    self.SPDC_source.add_receiver(receiver_2)
+    self.receiver_1=receiver_1
+    self.receiver_2=receiver_2
+    self.SPDC_source.add_receiver(self.receiver_1)
+    self.SPDC_source.add_receiver(self.receiver_2)
     print("BBM92_SPDC_source named: ",  self.name ," has been set")
 
 
 
-
-#  def get_photon(self, photon, **kwargs):
-#        self.send_qubit(kwargs['dst'], photon)
-
-
   def emit_photon(self):
          c = 1 / mt.sqrt(2)
-         self.SPDC_source.emit([[c+0j,c+0j],[c+0j,-c+0j]])
+         self.SPDC_source.emit([[c+0j,c+0j]])
+#         self.receiver_1.emission_flag()
+#         self.receiver_2.emission_flag()
+         
 
 
 
@@ -127,7 +130,7 @@ class BBM92_SPDC_source(nd.Node):
 
 def main():
 
-  runtime = 4e12
+  runtime = 4e11
   distance = 1e3
   tl = Timeline(runtime)
   tl.show_progress = True
@@ -157,25 +160,33 @@ def main():
 
 
   process = Process(Charlie, "emit_photon", [])
-  event = Event(0, process)
-  tl.schedule(event)
+  emission_event = Event(0, process)
+  tl.schedule(emission_event)
+  
+
 
   tl.init()
   tl.run()
 
-
-  print("detection count of Alice: {}".format(Alice.counter_plus.count))
-
-
-  print("detection count of Bob: {}".format(Bob.counter_plus.count))
+  Alice_dection_times=[]
+  Bob_dection_times=[]
 
 
-#  print("detection count of Alice: {}".format(Alice.counter_1.count))
-#  print("detection time of Alice: {}".format(Alice.counter_1.time))
+  Alice_dection_times.append(Alice.counter_plus.det_time)
+  Alice_dection_times.append(Alice.counter_minus.det_time)
+  Alice_dection_times.append(Alice.counter_0.det_time )
+  Alice_dection_times.append(Alice.counter_1.det_time)
 
-#  print("detection count of Bob: {}".format(Bob.counter_1.count))
-#  print("detection time of Bob: {}".format(Bob.counter_1.time))
+  Bob_dection_times.append(Alice.counter_plus.det_time)
+  Bob_dection_times.append(Alice.counter_minus.det_time)
+  Bob_dection_times.append(Alice.counter_0.det_time )
+  Bob_dection_times.append(Bob.counter_1.det_time)
 
+
+  for A_det_t in Alice_dection_times:
+    for B_det_t in Bob_dection_times:
+      if A_det_t==B_det_t:
+        print("Siumm" )
 
 if __name__ == "__main__":
   main()
