@@ -22,6 +22,7 @@ import sequence.utils.log as log
 
 class Register():
    def __init__(self,name=""):
+    self.n_of_events=0
     self.name="Register named "+ name
     self.detection_events = {
     "owner": [],
@@ -32,6 +33,7 @@ class Register():
 
    ######### Functions which is called by the detector counters and  updatwes the event list ################
    def register_event(self, owner_name, time, det_result):
+    self.n_of_events=self.n_of_events+1
     self.detection_events["owner"].append(owner_name)
     self.detection_events["time"].append(time)
     self.detection_events["det_result"].append(det_result)
@@ -40,6 +42,8 @@ class Register():
    ######### Function which allows to obtain the dictionary with the measurement results #################
    def get_registered_events(self):
     return self.detection_events
+
+      
 
 ################# Class that represents the counters for the photon detectors #########################
 
@@ -137,17 +141,15 @@ class BBM92_receiver(nd.Node):
     print("BBM92_receiver named: ",  self.name ," has been set")
 
 
-#  def emission_flag(self):
-#    print(self.name, "has been informed of an emission event")
-
 
 ############### class that represents a BBM92 source ###################################
 
 class BBM92_SPDC_source(nd.Node):
   
+ #################### SPDC source definition #####################
   def __init__(self,name="unnamed", freq=100000.0, tl = Timeline(2e10), receiver_1=None, receiver_2=None):
-  ###### source definition ##############
     super().__init__(name, tl)
+    self.frequency=freq
     self.name=name
     SPDC_name= name +" SPDC_source"
     self.SPDC_source = ls.SPDCSource(name=SPDC_name, timeline=tl, wavelengths=[1550,1550], frequency= freq, mean_photon_num=0.1, encoding_type={'bases': [((1 + 0j, 0j), (0j, 1 + 0j)), ((0.7071067811865476 + 0j, 0.7071067811865476 + 0j), (-0.7071067811865476 + 0j, 0.7071067811865476 + 0j))], 'name': 'polarization'}, phase_error=0.1)
@@ -164,8 +166,10 @@ class BBM92_SPDC_source(nd.Node):
   def emit_photon(self):
          c = 1 / mt.sqrt(2)
          self.SPDC_source.emit([[0j,c+0j,c+0j,0j]])
-#         self.receiver_1.emission_flag()
-#         self.receiver_2.emission_flag()
+
+  def get_frequency(self):
+    return self.frequency
+
          
 
 
@@ -222,6 +226,10 @@ def main():
   Alice_raw_key=[]
   Bob_raw_key=[]
   i=0
+
+
+
+
   while i<(len(results["owner"])-1):
     if (results["owner"][i]=="Bob" and results["owner"][i+1]=="Alice"):
 

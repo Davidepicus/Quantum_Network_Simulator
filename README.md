@@ -8,7 +8,8 @@ Il link alla documentazione del pacchetto SeQUeNCe è: https://sequence-rtd-tuto
 
 
 
-Per ora ci sono tre files nella repository. "BB84_test.py" è il test di una simulazione di un protocollo BB84. Questo file è una copia esatta del codice che si trova nella repository di Sequence. 
+Per ora ci sono due  files nella repository. "BB84_test.py" è il test di una simulazione di un protocollo BB84. Questo file è una copia esatta del codice che si trova nella repository di Sequence. 
+
 # BBM92 protocol simulation
 
 
@@ -24,4 +25,4 @@ Vi è inoltre una classe chiamata "det_counter" che serve per registrare gli arr
 
 # Stato della Simulazione
 
-Per ora le due classi sono funzionanti e connesse. I fotoni vengono emessi ed arrivano sui detector. Gli stati ottenuti dai due osservatori sono registrati.Le chiavi che si ottengono sono ancora completamente scorrelate.
+Per ora le due classi sono funzionanti e connesse. I fotoni vengono emessi ed arrivano sui detector. Gli stati ottenuti dai due osservatori sono registrati. Le chiavi che si ottengono sono ancora completamente scorrelate.
