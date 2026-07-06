@@ -13,32 +13,76 @@ from sequence.kernel.timeline import Timeline
 from sequence.kernel.event import Event
 from sequence.kernel.process import Process
 from sequence.components.memory import Memory
+import sequence.utils.log as log
 
 
 
+################## Defining register class ##############################
+
+
+class Register():
+   def __init__(self,name=""):
+    self.name="Register named "+ name
+    self.detection_events = {
+    "owner": [],
+    "time": [],
+    "det_result": []
+    }
+
+
+   ######### Functions which is called by the detector counters and  updatwes the event list ################
+   def register_event(self, owner_name, time, det_result):
+    self.detection_events["owner"].append(owner_name)
+    self.detection_events["time"].append(time)
+    self.detection_events["det_result"].append(det_result)
+
+
+   ######### Function which allows to obtain the dictionary with the measurement results #################
+   def get_registered_events(self):
+    return self.detection_events
 
 ################# Class that represents the counters for the photon detectors #########################
 
 
-class det_counter:
-  def __init__(self):
+class det_counter():
+  def __init__(self,det_name="none", owner="none", reg=None):
+    self.name=det_name
+    self.owner=owner
+    self.reg=reg
     self.count = 0
     self.time = 0
     self.det_time=[]
+    self.name="counter of " + det_name
 
+
+  ################# Trigger funcion which is called when a photon is detected. It registers its result in the register objecgt which is passed to the node ##############
   def trigger(self, detector, info):
     self.count += 1
     self.time = info['time']
     self.det_time.append(self.time)
+    result="none"
+
+    if (self.name=="counter of det_zero"):
+      result="0"
+    elif (self.name=="counter of det_one"):
+      result="1"
+    elif (self.name=="counter of det_plus"):
+      result="+"
+    elif (self.name=="counter of det_minus"):
+      result="-"
+
+    self.reg.register_event(self.owner, self.time, result )
+
 
 
 
 ################# Class that represents a BBM92 receiver ################################
 class BBM92_receiver(nd.Node):
   
-  def __init__(self,name="unnamed",det_eff=0.3,dark_counts=5000,count_rate_max=3*10**(6), tl = Timeline(2e10)):
+  def __init__(self,name="unnamed",det_eff=0.3,dark_counts=5000,count_rate_max=3*10**(6), tl = Timeline(2e10), reg=None):
     ###### detector definition ##############
     super().__init__(name, tl)
+    self.reg=reg
     self.name=name
     dect1_name= name+ "det1"
     dect2_name= name+ "det2"
@@ -80,19 +124,18 @@ class BBM92_receiver(nd.Node):
     self.PBSB.add_receiver(self.det_4)
   
     ######### Adding a counter #############
-    self.counter_0= det_counter()
+    self.counter_0= det_counter(det_name="det_zero", owner=self.name, reg=self.reg)
     self.det_1.attach(self.counter_0)
-    self.counter_1= det_counter()
+    self.counter_1= det_counter(det_name="det_one", owner=self.name, reg=self.reg)
     self.det_2.attach(self.counter_1)
-    self.counter_plus= det_counter()
+    self.counter_plus= det_counter (det_name="det_plus", owner=self.name, reg=self.reg)
     self.det_3.attach(self.counter_plus)
-    self.counter_minus= det_counter()
+    self.counter_minus= det_counter(det_name="det_minus", owner=self.name, reg=self.reg)
     self.det_4.attach(self.counter_minus)
 
-    ######### Defining list of detected basis ##########
-    
-
+    ######### Informing user about creation of the BBM92_receiver  ##########
     print("BBM92_receiver named: ",  self.name ," has been set")
+
 
 #  def emission_flag(self):
 #    print(self.name, "has been informed of an emission event")
@@ -113,13 +156,14 @@ class BBM92_SPDC_source(nd.Node):
     self.receiver_2=receiver_2
     self.SPDC_source.add_receiver(self.receiver_1)
     self.SPDC_source.add_receiver(self.receiver_2)
-    print("BBM92_SPDC_source named: ",  self.name ," has been set")
 
+    ######### Informing user about creation of the BBM92_SPDC_emitter  ##########
+    print("BBM92_SPDC_source named: ",  self.name ," has been set")
 
 
   def emit_photon(self):
          c = 1 / mt.sqrt(2)
-         self.SPDC_source.emit([[c+0j,c+0j]])
+         self.SPDC_source.emit([[0j,c+0j,c+0j,0j]])
 #         self.receiver_1.emission_flag()
 #         self.receiver_2.emission_flag()
          
@@ -130,14 +174,16 @@ class BBM92_SPDC_source(nd.Node):
 
 def main():
 
-  runtime = 4e11
+  Reg=Register("BBM92_Reg")
+  runtime = 4e13
+  sim_time=runtime*10**(-12)
   distance = 1e3
   tl = Timeline(runtime)
   tl.show_progress = True
 
 #### Defining nodes, Alice and Bob (the receivers) and Charlie (the sender)
-  Alice = BBM92_receiver(name="Alice", tl=tl)
-  Bob = BBM92_receiver(name="Bob", tl=tl)
+  Alice = BBM92_receiver(name="Alice", tl=tl, reg=Reg)
+  Bob = BBM92_receiver(name="Bob", tl=tl, reg=Reg)
   Charlie = BBM92_SPDC_source(name="Charlie", tl=tl, receiver_1=Alice, receiver_2=Bob)
   Alice.set_seed(0)
   Bob.set_seed(1)
@@ -158,35 +204,102 @@ def main():
 
 
 
-
+  ############## Defining the processes and events ############# 
   process = Process(Charlie, "emit_photon", [])
   emission_event = Event(0, process)
   tl.schedule(emission_event)
-  
 
 
+
+  ###### Running the simulation ###############
   tl.init()
   tl.run()
 
-  Alice_dection_times=[]
-  Bob_dection_times=[]
+  #######  Getting the dictionary with the result ###########
+  results=Reg.get_registered_events()
 
 
-  Alice_dection_times.append(Alice.counter_plus.det_time)
-  Alice_dection_times.append(Alice.counter_minus.det_time)
-  Alice_dection_times.append(Alice.counter_0.det_time )
-  Alice_dection_times.append(Alice.counter_1.det_time)
+  Alice_raw_key=[]
+  Bob_raw_key=[]
+  i=0
+  while i<(len(results["owner"])-1):
+    if (results["owner"][i]=="Bob" and results["owner"][i+1]=="Alice"):
 
-  Bob_dection_times.append(Alice.counter_plus.det_time)
-  Bob_dection_times.append(Alice.counter_minus.det_time)
-  Bob_dection_times.append(Alice.counter_0.det_time )
-  Bob_dection_times.append(Bob.counter_1.det_time)
+      ##################### Checking if bob and Alice measured using the same basis (+,-) in this case ########################
+      if (results["det_result"][i]=="+" or results["det_result"][i]=="-") and (results["det_result"][i+1]=="+" or results["det_result"][i+1]=="-"):
 
 
-  for A_det_t in Alice_dection_times:
-    for B_det_t in Bob_dection_times:
-      if A_det_t==B_det_t:
-        print("Siumm" )
+        if (results["det_result"][i]=="+"):
+          Bob_raw_key.append(0)
+        elif (results["det_result"][i]=="-"):
+          Bob_raw_key.append(1)
+        if (results["det_result"][i+1]=="+"):
+          Alice_raw_key.append(0)
+        elif (results["det_result"][i+1]=="-"):
+          Alice_raw_key.append(1)
+
+      ##################### Checking if bob and Alice measured using the same basis (0,1) in this case ########################
+      if (results["det_result"][i]=="0" or results["det_result"][i]=="1") and (results["det_result"][i+1]=="0" or results["det_result"][i+1]=="1"):
+
+        if (results["det_result"][i]=="0"):
+          Bob_raw_key.append(0)
+        elif (results["det_result"][i]=="1"):
+          Bob_raw_key.append(1)
+        if (results["det_result"][i+1]=="0"):
+          Alice_raw_key.append(0)
+        elif (results["det_result"][i+1]=="1"):
+          Alice_raw_key.append(1)
+
+    if (results["owner"][i]=="Alice" and results["owner"][i+1]=="Bob"):
+
+      ##################### Checking if bob and Alice measured using the same basis (+,-) in this case ########################
+      if (results["det_result"][i]=="+" or results["det_result"][i]=="-") and (results["det_result"][i+1]=="+" or results["det_result"][i+1]=="-"):
+
+
+        if (results["det_result"][i]=="+"):
+          Alice_raw_key.append(0)
+        elif (results["det_result"][i]=="-"):
+          Alice_raw_key.append(1)
+        if (results["det_result"][i+1]=="+"):
+          Bob_raw_key.append(0)
+        elif (results["det_result"][i+1]=="-"):
+          Bob_raw_key.append(1)
+
+      ##################### Checking if bob and Alice measured using the same basis (0,1) in this case ########################
+      elif (results["det_result"][i]=="0" or results["det_result"][i]=="1") and (results["det_result"][i+1]=="0" or results["det_result"][i+1]=="1"):
+
+        if (results["det_result"][i]=="0"):
+          Alice_raw_key.append(0)
+        elif (results["det_result"][i]=="1"):
+          Alice_raw_key.append(1)
+        if (results["det_result"][i+1]=="0"):
+          Bob_raw_key.append(0)
+        elif (results["det_result"][i+1]=="1"):
+          Bob_raw_key.append(1)
+
+
+      i=i+2
+    else:
+      i=i+1
+
+
+  print("\n \n")
+  print("The length of the raw key is:", len(Alice_raw_key))
+  print("Total simulation time is: ", sim_time)
+  print("The key rate is: ", len(Alice_raw_key)/sim_time)
+
+  equal_bits=0
+  different_bits=0
+  for j in range (len(Alice_raw_key)):
+    if Alice_raw_key[j]==Bob_raw_key[j]:
+      equal_bits=equal_bits+1
+    else:
+      different_bits=different_bits +1
+
+  QBER=equal_bits/len(Alice_raw_key)
+  print("The quantum bit error rate is:", QBER)
+    
+
 
 if __name__ == "__main__":
   main()
