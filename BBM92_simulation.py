@@ -25,18 +25,26 @@ class Register():
     self.n_of_events=0
     self.name="Register named "+ name
     self.detection_events = {
-    "owner": [],
-    "time": [],
-    "det_result": []
+    "Basis": [],
+    "Time": [],
+    "Det_result": []
     }
 
 
    ######### Functions which is called by the detector counters and  updatwes the event list ################
    def register_event(self, owner_name, time, det_result):
     self.n_of_events=self.n_of_events+1
-    self.detection_events["owner"].append(owner_name)
-    self.detection_events["time"].append(time)
-    self.detection_events["det_result"].append(det_result)
+    self.detection_events["Time"].append(time)
+    if (det_result=="+" or det_result=="-"):
+      self.detection_events["Basis"].append("+-")
+    elif (det_result=="0" or det_result=="1"):
+      self.detection_events["Basis"].append("01")
+
+    if (det_result=="+" or det_result=="0"):
+      self.detection_events["Det_result"].append(0)
+    elif (det_result=="-" or det_result=="1"):
+      self.detection_events["Det_result"].append(1)    
+
 
 
    ######### Function which allows to obtain the dictionary with the measurement results #################
@@ -145,14 +153,18 @@ class BBM92_receiver(nd.Node):
 ############### class that represents a BBM92 source ###################################
 
 class BBM92_SPDC_source(nd.Node):
-  
- #################### SPDC source definition #####################
-  def __init__(self,name="unnamed", freq=100000.0, tl = Timeline(2e10), receiver_1=None, receiver_2=None):
+
+  def __init__(self,name="unnamed", freq=10000000.0, tl = Timeline(2e10), receiver_1=None, receiver_2=None):
     super().__init__(name, tl)
     self.frequency=freq
     self.name=name
     SPDC_name= name +" SPDC_source"
-    self.SPDC_source = ls.SPDCSource(name=SPDC_name, timeline=tl, wavelengths=[1550,1550], frequency= freq, mean_photon_num=0.1, encoding_type={'bases': [((1 + 0j, 0j), (0j, 1 + 0j)), ((0.7071067811865476 + 0j, 0.7071067811865476 + 0j), (-0.7071067811865476 + 0j, 0.7071067811865476 + 0j))], 'name': 'polarization'}, phase_error=0.1)
+    encoding_polarizzazione = {'name': 'polarization', 'bases': [ ((1 + 0j, 0j), (0j, 1 + 0j)),((0.707+0j, 0.707+0j), (-0.707+0j, 0.707+0j)) ]}
+    self.SPDC_source = ls.SPDCSource(name=SPDC_name, timeline=tl, frequency=freq, wavelengths=[1550,1550], mean_photon_num=0.1, encoding_type=encoding_polarizzazione, phase_error=0.1)
+
+
+#encoding_type={'bases': [((1 + 0j, 0j), (0j, 1 + 0j)), ((0.7071067811865476 + 0j, 0.7071067811865476 + 0j), (-0.7071067811865476 + 0j, 0.7071067811865476 + 0j))], 'name': 'polarization'}
+
     self.add_component(self.SPDC_source)
     self.receiver_1=receiver_1
     self.receiver_2=receiver_2
@@ -165,7 +177,7 @@ class BBM92_SPDC_source(nd.Node):
 
   def emit_photon(self):
          c = 1 / mt.sqrt(2)
-         self.SPDC_source.emit([[0j,c+0j,c+0j,0j]])
+         self.SPDC_source.emit([[c + 0j,0 +0j,0 +0j, c + 0j]])
 
   def get_frequency(self):
     return self.frequency
@@ -178,16 +190,17 @@ class BBM92_SPDC_source(nd.Node):
 
 def main():
 
-  Reg=Register("BBM92_Reg")
-  runtime = 4e13
+  Reg_Alice=Register("BBM92_Reg_Alice")
+  Reg_Bob=Register("BBM92_Reg_Bob")
+  runtime = 1e12
   sim_time=runtime*10**(-12)
   distance = 1e3
   tl = Timeline(runtime)
   tl.show_progress = True
 
 #### Defining nodes, Alice and Bob (the receivers) and Charlie (the sender)
-  Alice = BBM92_receiver(name="Alice", tl=tl, reg=Reg)
-  Bob = BBM92_receiver(name="Bob", tl=tl, reg=Reg)
+  Alice = BBM92_receiver(name="Alice", tl=tl, reg=Reg_Alice)
+  Bob = BBM92_receiver(name="Bob", tl=tl, reg=Reg_Bob)
   Charlie = BBM92_SPDC_source(name="Charlie", tl=tl, receiver_1=Alice, receiver_2=Bob)
   Alice.set_seed(0)
   Bob.set_seed(1)
@@ -220,93 +233,48 @@ def main():
   tl.run()
 
   #######  Getting the dictionary with the result ###########
-  results=Reg.get_registered_events()
+  results_Alice=Reg_Alice.get_registered_events()
+  results_Bob=Reg_Bob.get_registered_events()
 
-
+  n_Alice_measurements=len(results_Alice["Time"])
+  n_Bob_measurements=len(results_Bob["Time"])
+  offset=3000
+  coincident_counts=0 
   Alice_raw_key=[]
   Bob_raw_key=[]
-  i=0
+
+
+  print("\n\n")
+  print("Number of Alice counts is: ",n_Alice_measurements )
+  print("Number of Bob counts is: ",n_Bob_measurements )
+
+  for i in range(n_Alice_measurements):
+    for j in range(n_Bob_measurements):
+      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=300000 and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
+        coincident_counts=coincident_counts+1
+        Alice_raw_key.append(results_Alice["Det_result"][i])
+        Bob_raw_key.append(results_Bob["Det_result"][j])
+        print("ess", i,j, "time difference= ", results_Alice["Time"][i]-results_Bob["Time"][j]) 
+        break
 
 
 
-
-  while i<(len(results["owner"])-1):
-    if (results["owner"][i]=="Bob" and results["owner"][i+1]=="Alice"):
-
-      ##################### Checking if bob and Alice measured using the same basis (+,-) in this case ########################
-      if (results["det_result"][i]=="+" or results["det_result"][i]=="-") and (results["det_result"][i+1]=="+" or results["det_result"][i+1]=="-"):
+  print("Number of coincident counts is: ",coincident_counts )
 
 
-        if (results["det_result"][i]=="+"):
-          Bob_raw_key.append(0)
-        elif (results["det_result"][i]=="-"):
-          Bob_raw_key.append(1)
-        if (results["det_result"][i+1]=="+"):
-          Alice_raw_key.append(0)
-        elif (results["det_result"][i+1]=="-"):
-          Alice_raw_key.append(1)
-
-      ##################### Checking if bob and Alice measured using the same basis (0,1) in this case ########################
-      if (results["det_result"][i]=="0" or results["det_result"][i]=="1") and (results["det_result"][i+1]=="0" or results["det_result"][i+1]=="1"):
-
-        if (results["det_result"][i]=="0"):
-          Bob_raw_key.append(0)
-        elif (results["det_result"][i]=="1"):
-          Bob_raw_key.append(1)
-        if (results["det_result"][i+1]=="0"):
-          Alice_raw_key.append(0)
-        elif (results["det_result"][i+1]=="1"):
-          Alice_raw_key.append(1)
-
-    if (results["owner"][i]=="Alice" and results["owner"][i+1]=="Bob"):
-
-      ##################### Checking if bob and Alice measured using the same basis (+,-) in this case ########################
-      if (results["det_result"][i]=="+" or results["det_result"][i]=="-") and (results["det_result"][i+1]=="+" or results["det_result"][i+1]=="-"):
-
-
-        if (results["det_result"][i]=="+"):
-          Alice_raw_key.append(0)
-        elif (results["det_result"][i]=="-"):
-          Alice_raw_key.append(1)
-        if (results["det_result"][i+1]=="+"):
-          Bob_raw_key.append(0)
-        elif (results["det_result"][i+1]=="-"):
-          Bob_raw_key.append(1)
-
-      ##################### Checking if bob and Alice measured using the same basis (0,1) in this case ########################
-      elif (results["det_result"][i]=="0" or results["det_result"][i]=="1") and (results["det_result"][i+1]=="0" or results["det_result"][i+1]=="1"):
-
-        if (results["det_result"][i]=="0"):
-          Alice_raw_key.append(0)
-        elif (results["det_result"][i]=="1"):
-          Alice_raw_key.append(1)
-        if (results["det_result"][i+1]=="0"):
-          Bob_raw_key.append(0)
-        elif (results["det_result"][i+1]=="1"):
-          Bob_raw_key.append(1)
-
-
-      i=i+2
+  correct_counts=0
+  different_counts=0
+  for k in range(coincident_counts)  :
+    if Bob_raw_key[k]==Alice_raw_key[k]:
+      correct_counts=correct_counts+1
     else:
-      i=i+1
+      different_counts=different_counts+1
 
 
-  print("\n \n")
-  print("The length of the raw key is:", len(Alice_raw_key))
-  print("Total simulation time is: ", sim_time)
-  print("The key rate is: ", len(Alice_raw_key)/sim_time)
 
-  equal_bits=0
-  different_bits=0
-  for j in range (len(Alice_raw_key)):
-    if Alice_raw_key[j]==Bob_raw_key[j]:
-      equal_bits=equal_bits+1
-    else:
-      different_bits=different_bits +1
+  QBER=different_counts/coincident_counts
+  print("The QBER is: ", QBER)
 
-  QBER=equal_bits/len(Alice_raw_key)
-  print("The quantum bit error rate is:", QBER)
-    
 
 
 if __name__ == "__main__":
