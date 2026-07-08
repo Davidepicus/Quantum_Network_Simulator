@@ -17,8 +17,29 @@ import sequence.utils.log as log
 
 
 
-################## Defining register class ##############################
 
+
+
+
+################# redifining correct beam splitter class ###################
+
+
+class PBeamSplitter(BS.BeamSplitter):
+  def __init__(self, name=None, timeline=None, fidelity=1):
+    super().__init__(name=name, timeline=timeline, fidelity=fidelity)
+
+  def get_2(self, photon):
+    self.get(photon)
+
+  def getx2(self, photon):
+    self.get(photon)
+
+  def get_2x2(self, photon):
+    self.get(photon)
+
+
+
+################## Defining register class ##############################
 
 class Register():
    def __init__(self,name=""):
@@ -57,7 +78,8 @@ class Register():
 
 
 class det_counter():
-  def __init__(self,det_name="none", owner="none", reg=None):
+  def __init__(self,det_name="none", owner="none", reg=None, timeline=None):
+    self.timeline=timeline
     self.name=det_name
     self.owner=owner
     self.reg=reg
@@ -70,7 +92,7 @@ class det_counter():
   ################# Trigger funcion which is called when a photon is detected. It registers its result in the register objecgt which is passed to the node ##############
   def trigger(self, detector, info):
     self.count += 1
-    self.time = info['time']
+    self.time = self.timeline.now()
     self.det_time.append(self.time)
     result="none"
 
@@ -91,7 +113,7 @@ class det_counter():
 ################# Class that represents a BBM92 receiver ################################
 class BBM92_receiver(nd.Node):
   
-  def __init__(self,name="unnamed",det_eff=0.3,dark_counts=5000,count_rate_max=3*10**(6), tl = Timeline(2e10), reg=None):
+  def __init__(self,name="unnamed",det_eff=0.3,dark_counts=0,count_rate_max=3*10**(6), tl = Timeline(2e10), reg=None):
     ###### detector definition ##############
     super().__init__(name, tl)
     self.reg=reg
@@ -110,45 +132,64 @@ class BBM92_receiver(nd.Node):
     self.add_component(self.det_4)
 
     ######## Beam splitter definition ###############
+    self.bs_counter=0
     bs_name= name+ "initial_beam_splitter"
-    self.bs=BS.BeamSplitter(name=bs_name, timeline=tl, fidelity=0.99)
+    self.bs=BS.FockBeamSplitter2(name=bs_name, owner=self.name,  timeline=tl, efficiency=0.99, photon_counter=self.bs_counter, src_list=["Charlie"])
     self.add_component(self.bs)
 
     ######### Polarization beam splitter definition, measurement on the Z basis ############
+    polarization_Z  ={"name": ["polarization"],"bases": [((complex(1), complex(0)), (complex(0), complex(1)))]}
     PBSA_name= name + "Polarizing_Beam_splitter_A"
-    self.PBSA=BS.BeamSplitter(name=PBSA_name, timeline=tl, fidelity=0.99)
+    self.PBSA=PBeamSplitter(name=PBSA_name, timeline=tl, fidelity=0.99)
     self.add_component(self.PBSA)
-    self.PBSA.set_basis_list(basis_list=[0], start_time=0, frequency=0)
 
-    ######### Polarization beam splitter definition, measurement on the Z basis ############
+    basis_list_PBSA=[0]
+    for t in range(500000):
+      basis_list_PBSA.append(0)
+
+
+    self.PBSA.set_basis_list([0], start_time=0, frequency=0)
+
+    ######### Polarization beam splitter definition, measurement on the x basis ############
+    polarization_X ={"name": ["polarization"],"bases": [((complex(np.sqrt(1 / 2)), complex(np.sqrt(1 / 2))), (complex(-np.sqrt(1 / 2)), complex(np.sqrt(1 / 2))))]}
     PBSB_name= name + "Polarizing_Beam_splitter_B"
-    self.PBSB=BS.BeamSplitter(name=PBSB_name, timeline=tl, fidelity=0.99)
+    self.PBSB=PBeamSplitter(name=PBSB_name, timeline=tl, fidelity=0.99)
     self.add_component(self.PBSB)
-    self.PBSB.set_basis_list(basis_list=[1], start_time=0, frequency=0)
+
+    basis_list_PBSB=[1]
+    for t in range(500000):
+      basis_list_PBSB.append(1)
+
+
+
+    self.PBSB.set_basis_list([1], start_time=0, frequency=0)
 
     ######## Connecting the hardware ##################
     self.set_first_component(self.bs)
     self.bs.add_receiver(self.PBSA)
     self.bs.add_receiver(self.PBSA)
+    #self.PBSA.receivers = [self.det_1, self.det_2]
+    #self.PBSA.receivers = [self.det_3, self.det_3]
     self.PBSA.add_receiver(self.det_1)
     self.PBSA.add_receiver(self.det_2)
     self.PBSB.add_receiver(self.det_3)
     self.PBSB.add_receiver(self.det_4)
   
     ######### Adding a counter #############
-    self.counter_0= det_counter(det_name="det_zero", owner=self.name, reg=self.reg)
+    self.counter_0= det_counter(det_name="det_zero", owner=self.name, reg=self.reg, timeline=tl)
     self.det_1.attach(self.counter_0)
-    self.counter_1= det_counter(det_name="det_one", owner=self.name, reg=self.reg)
+    self.counter_1= det_counter(det_name="det_one", owner=self.name, reg=self.reg, timeline=tl)
     self.det_2.attach(self.counter_1)
-    self.counter_plus= det_counter (det_name="det_plus", owner=self.name, reg=self.reg)
+    self.counter_plus= det_counter (det_name="det_plus", owner=self.name, reg=self.reg, timeline=tl)
     self.det_3.attach(self.counter_plus)
-    self.counter_minus= det_counter(det_name="det_minus", owner=self.name, reg=self.reg)
+    self.counter_minus= det_counter(det_name="det_minus", owner=self.name, reg=self.reg, timeline=tl)
     self.det_4.attach(self.counter_minus)
 
     ######### Informing user about creation of the BBM92_receiver  ##########
     print("BBM92_receiver named: ",  self.name ," has been set")
 
-
+  def get(self, photon):
+    self.bs.get("Charlie", photon)
 
 ############### class that represents a BBM92 source ###################################
 
@@ -159,8 +200,9 @@ class BBM92_SPDC_source(nd.Node):
     self.frequency=freq
     self.name=name
     SPDC_name= name +" SPDC_source"
-    encoding_polarizzazione = {'name': 'polarization', 'bases': [ ((1 + 0j, 0j), (0j, 1 + 0j)),((0.707+0j, 0.707+0j), (-0.707+0j, 0.707+0j)) ]}
-    self.SPDC_source = ls.SPDCSource(name=SPDC_name, timeline=tl, frequency=freq, wavelengths=[1550,1550], mean_photon_num=0.1, encoding_type=encoding_polarizzazione, phase_error=0.1)
+    polarization ={"name": "polarization","bases": [((complex(1), complex(0)), (complex(0), complex(1))),((complex(np.sqrt(1 / 2)), complex(np.sqrt(1 / 2))), (complex(-np.sqrt(1 / 2)), complex(np.sqrt(1 / 2))))]}
+
+    self.SPDC_source = ls.SPDCSource(name=SPDC_name, timeline=tl, frequency=freq, wavelengths=[1550,1550], mean_photon_num=0.1,encoding_type=polarization, phase_error=0)
 
 
 #encoding_type={'bases': [((1 + 0j, 0j), (0j, 1 + 0j)), ((0.7071067811865476 + 0j, 0.7071067811865476 + 0j), (-0.7071067811865476 + 0j, 0.7071067811865476 + 0j))], 'name': 'polarization'}
@@ -175,9 +217,11 @@ class BBM92_SPDC_source(nd.Node):
     print("BBM92_SPDC_source named: ",  self.name ," has been set")
 
 
-  def emit_photon(self):
-         c = 1 / mt.sqrt(2)
-         self.SPDC_source.emit([[c + 0j,0 +0j,0 +0j, c + 0j]])
+  def emit_photons(self):
+    c = 1 / mt.sqrt(2)
+    phi_plus = [c + 0j, c + 0j]
+    self.SPDC_source.emit( [phi_plus])
+
 
   def get_frequency(self):
     return self.frequency
@@ -192,15 +236,17 @@ def main():
 
   Reg_Alice=Register("BBM92_Reg_Alice")
   Reg_Bob=Register("BBM92_Reg_Bob")
-  runtime = 1e12
+  runtime = 2e14
   sim_time=runtime*10**(-12)
   distance = 1e3
   tl = Timeline(runtime)
   tl.show_progress = True
 
-#### Defining nodes, Alice and Bob (the receivers) and Charlie (the sender)
+#### Defining nodes, Alice and Bob (the receivers) and Charlie (the sender), and quantum channels
   Alice = BBM92_receiver(name="Alice", tl=tl, reg=Reg_Alice)
   Bob = BBM92_receiver(name="Bob", tl=tl, reg=Reg_Bob)
+  qc0 = optch.QuantumChannel("qc0", tl, distance=distance, polarization_fidelity=0.97, attenuation=0.0002)
+  qc1 = optch.QuantumChannel("qc1", tl, distance=distance, polarization_fidelity=0.97, attenuation=0.0002)
   Charlie = BBM92_SPDC_source(name="Charlie", tl=tl, receiver_1=Alice, receiver_2=Bob)
   Alice.set_seed(0)
   Bob.set_seed(1)
@@ -208,23 +254,26 @@ def main():
 
 
 
-#### Defining channels and connecting the nodes
-  qc0 = optch.QuantumChannel("qc0", tl, distance=distance, polarization_fidelity=0.97, attenuation=0.0002)
-  qc1 = optch.QuantumChannel("qc1", tl, distance=distance, polarization_fidelity=0.97, attenuation=0.0002)
+#### Setting Bob and Alice as the receivers
+
   qc0.set_ends(Charlie, Alice.name)
   qc1.set_ends(Charlie, Bob.name)
 
-  cc0 = optch.ClassicalChannel("cc0", tl, distance=distance)
-  cc1 = optch.ClassicalChannel("cc1", tl, distance=distance)
-  cc0.set_ends(Alice, Bob.name)
-  cc1.set_ends(Bob, Alice.name)
+#  cc0 = optch.ClassicalChannel("cc0", tl, distance=distance)
+#  cc1 = optch.ClassicalChannel("cc1", tl, distance=distance)
+#  cc0.set_ends(Alice, Bob.name)
+#  cc1.set_ends(Bob, Alice.name)
 
 
 
-  ############## Defining the processes and events ############# 
-  process = Process(Charlie, "emit_photon", [])
-  emission_event = Event(0, process)
-  tl.schedule(emission_event)
+  ############## Defining the processes and events #############
+  process = Process(Charlie, "emit_photons", [])
+  emission_event=[]
+  for t in range(50):
+    emission_event.append(Event(t+1, process))
+
+  for h in range (len(emission_event)):
+    tl.schedule(emission_event[h])
 
 
 
@@ -232,13 +281,15 @@ def main():
   tl.init()
   tl.run()
 
+
   #######  Getting the dictionary with the result ###########
   results_Alice=Reg_Alice.get_registered_events()
   results_Bob=Reg_Bob.get_registered_events()
 
+  print(results_Alice)
   n_Alice_measurements=len(results_Alice["Time"])
   n_Bob_measurements=len(results_Bob["Time"])
-  offset=3000
+  offset=0
   coincident_counts=0 
   Alice_raw_key=[]
   Bob_raw_key=[]
@@ -248,17 +299,23 @@ def main():
   print("Number of Alice counts is: ",n_Alice_measurements )
   print("Number of Bob counts is: ",n_Bob_measurements )
 
-  for i in range(n_Alice_measurements):
-    for j in range(n_Bob_measurements):
-      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=300000 and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
+
+
+  start=0
+  for i in range (n_Alice_measurements): 
+    for j in range(0,n_Bob_measurements,1):
+      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=31000 and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
         coincident_counts=coincident_counts+1
         Alice_raw_key.append(results_Alice["Det_result"][i])
         Bob_raw_key.append(results_Bob["Det_result"][j])
-        print("ess", i,j, "time difference= ", results_Alice["Time"][i]-results_Bob["Time"][j]) 
+        print("ess", i,j, "time difference= ", results_Alice["Time"][i]-results_Bob["Time"][j])
+        start=j
         break
 
+      
+    
 
-
+  print(Alice_raw_key)
   print("Number of coincident counts is: ",coincident_counts )
 
 
@@ -270,10 +327,12 @@ def main():
     else:
       different_counts=different_counts+1
 
-
-
-  QBER=different_counts/coincident_counts
-  print("The QBER is: ", QBER)
+  if coincident_counts==0:
+    print("No coincident counts have been detected, therefore QBER cannot be estimated")
+  else:
+    QBER=different_counts/coincident_counts
+    print("The QBER is: ", QBER)
+  
 
 
 

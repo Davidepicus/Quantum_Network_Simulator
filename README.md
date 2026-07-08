@@ -20,9 +20,9 @@ Vi sono due classi che costituiscono i due tipi di nodi necessari per il protoco
 
 "BBM92_receiver" è invece la classe che simula un ricevitore BBM92. Il ricevitore è costituito da un beam splitter 50/50 1X2, due polarizing beam splitter che misurano la polarizzazione dei fotoni nelle diverse basi (base {H,V} e base {+.-}), e 4 detector.
 
-Vi è inoltre una classe chiamata "det_counter" che serve per registrare gli arrivi e le misure dei fotoni, mentre la classe "Register" permette di registrare in un dizionario I risultati delle misure dei due nodi ed il tempo di arrivo dei fotoni 
+Vi è inoltre una classe chiamata "det_counter" che serve per registrare gli arrivi e le misure dei fotoni, mentre la classe "Register" permette di registrare in un dizionario I risultati delle misure di ognuno dei due nodi, il tempo di arrivo dei fotoni e la base utilizzata per la misura.
 
 
 # Stato della Simulazione
 
-Per ora le due classi sono funzionanti e connesse. I fotoni vengono emessi ed arrivano sui detector. Gli stati ottenuti dai due osservatori sono registrati. Le chiavi che si ottengono sono ancora completamente scorrelate.
+Per ora le due classi sono funzionanti ma non connesse. I fotoni vengono emessi ma non viaggiano e non arrivano sui detector. Le misure ottenute dai due osservatori sono registrate. I fotoni  presenti sono tuttavia totalmente scorrelati in quanto sono solo conteggi oscuri. Le chiavi che si ottengono sono ancora completamente scorrelate. Serve ottimizzare anche l'algoritmo di post processing
