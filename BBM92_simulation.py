@@ -14,31 +14,88 @@ from sequence.kernel.event import Event
 from sequence.kernel.process import Process
 from sequence.components.memory import Memory
 import sequence.utils.log as log
+import random
 
 
 
 
+################ redefining correct Polarizing beam splitter class ###########################
 
+class BeamSplitter(BS.FockBeamSplitter2):
+   def __init__(self, name_i="none", owner_i=None, tml=None, eff=1, ph_counter=0, source_list=["none"]):
+    super().__init__( name=name_i, owner=owner_i, timeline=tml, efficiency=eff, photon_counter=ph_counter, src_list=source_list)
+
+
+   def get(self, source, photon) -> None:
+        """Receive photon from one end nodes"""
+
+        self.photon_counter += 1
+            
+        #print(f"Photon counter BEAM SPLITTER: {self.photon_counter} at time {self.timeline.now()}")
+
+        selected_receiver = random.choice(self._receivers)
+        #print(selected_receiver)
+
+        if self.photon_counter == 1:
+            
+            selected_receiver.get(photon)
+            #selected_receiver.get_2(photon)
+            self.photon_counter=0 
+
+#        elif self.photon_counter == 2:
+            
+#            self._receivers[0].photon_counter = 0
+#            self._receivers[1].photon_counter = 0
+#            self._receivers[0].photon_counter2 = 0
+#            self._receivers[1].photon_counter2 = 0
+#            selected_receiver.getx2(photon)
+#            selected_receiver.get_2x2(photon)
 
 
 ################# redifining correct beam splitter class ###################
 
 
 class PBeamSplitter(BS.BeamSplitter):
-  def __init__(self, name=None, timeline=None, fidelity=1):
+  def __init__(self, name="none", timeline=None, fidelity=1):
     super().__init__(name=name, timeline=timeline, fidelity=fidelity)
+    self.con=0
 
   def get_2(self, photon):
+    #self.con=self.con+1
+    #print("get_2 called")
     self.get(photon)
 
   def getx2(self, photon):
-    self.get(photon)
+    self.con=self.con+1
+    print("getx2 called")
+    #self.get(photon)
 
   def get_2x2(self, photon):
-    self.get(photon)
+    self.con=self.con+1
+    print("get_2x2 called")
+    #self.get(photon)
 
+  def get(self, Photon, **kwargs) -> None:
+    """Method to receive a photon for measurement.
 
+        Args:
+            photon (Photon): photon to measure (must have polarization encoding)
 
+        Side Effects:
+            May call get method of one receiver.
+        """
+
+    assert Photon.encoding_type["name"] == "polarization", "Beamsplitter should only be used with polarization."
+
+    if self.get_generator().random() < self.fidelity: 
+      #index = int((self.timeline.now() - self.start_time) * self.frequency * 1e-12)
+      index=1
+      if 0 > index or index >= len(self.basis_list):
+          return
+      else:
+        res = Photon.measure(Photon.encoding_type["bases"][self.basis_list[index]],Photon, self.get_generator())
+        #print(self._receivers)
+        self._receivers[res].get(Photon)
 ################## Defining register class ##############################
 
 class Register():
@@ -78,7 +135,7 @@ class Register():
 
 
 class det_counter():
-  def __init__(self,det_name="none", owner="none", reg=None, timeline=None):
+  def __init__(self,det_name="", owner="none", reg=None, timeline=None):
     self.timeline=timeline
     self.name=det_name
     self.owner=owner
@@ -113,7 +170,7 @@ class det_counter():
 ################# Class that represents a BBM92 receiver ################################
 class BBM92_receiver(nd.Node):
   
-  def __init__(self,name="unnamed",det_eff=0.3,dark_counts=0,count_rate_max=3*10**(6), tl = Timeline(2e10), reg=None):
+  def __init__(self,name="unnamed",det_eff=0.9,dark_counts=0,count_rate_max=3*10**(18), tl = Timeline(2e10), reg=None):
     ###### detector definition ##############
     super().__init__(name, tl)
     self.reg=reg
@@ -134,13 +191,13 @@ class BBM92_receiver(nd.Node):
     ######## Beam splitter definition ###############
     self.bs_counter=0
     bs_name= name+ "initial_beam_splitter"
-    self.bs=BS.FockBeamSplitter2(name=bs_name, owner=self.name,  timeline=tl, efficiency=0.99, photon_counter=self.bs_counter, src_list=["Charlie"])
+    self.bs=BeamSplitter(name_i=bs_name, owner_i=self.name,  tml=tl, eff=0.999, ph_counter=self.bs_counter, source_list=["Charlie"])
     self.add_component(self.bs)
 
     ######### Polarization beam splitter definition, measurement on the Z basis ############
-    polarization_Z  ={"name": ["polarization"],"bases": [((complex(1), complex(0)), (complex(0), complex(1)))]}
+    polarization_Z  =[complex(1), complex(0), complex(0), complex(1)]
     PBSA_name= name + "Polarizing_Beam_splitter_A"
-    self.PBSA=PBeamSplitter(name=PBSA_name, timeline=tl, fidelity=0.99)
+    self.PBSA=PBeamSplitter(name=PBSA_name, timeline=tl, fidelity=0.999)
     self.add_component(self.PBSA)
 
     basis_list_PBSA=[0]
@@ -148,10 +205,10 @@ class BBM92_receiver(nd.Node):
       basis_list_PBSA.append(0)
 
 
-    self.PBSA.set_basis_list([0], start_time=0, frequency=0)
+    self.PBSA.set_basis_list([0,0,0], start_time=0, frequency=1*10**12)
 
     ######### Polarization beam splitter definition, measurement on the x basis ############
-    polarization_X ={"name": ["polarization"],"bases": [((complex(np.sqrt(1 / 2)), complex(np.sqrt(1 / 2))), (complex(-np.sqrt(1 / 2)), complex(np.sqrt(1 / 2))))]}
+    polarization_X = [complex(np.sqrt(1 / 2)), complex(np.sqrt(1 / 2)), complex(-np.sqrt(1 / 2)), complex(np.sqrt(1 / 2))] 
     PBSB_name= name + "Polarizing_Beam_splitter_B"
     self.PBSB=PBeamSplitter(name=PBSB_name, timeline=tl, fidelity=0.99)
     self.add_component(self.PBSB)
@@ -162,12 +219,11 @@ class BBM92_receiver(nd.Node):
 
 
 
-    self.PBSB.set_basis_list([1], start_time=0, frequency=0)
-
+    self.PBSB.set_basis_list([1,1,1], start_time=0, frequency=1*10**12)
     ######## Connecting the hardware ##################
     self.set_first_component(self.bs)
     self.bs.add_receiver(self.PBSA)
-    self.bs.add_receiver(self.PBSA)
+    self.bs.add_receiver(self.PBSB)
     #self.PBSA.receivers = [self.det_1, self.det_2]
     #self.PBSA.receivers = [self.det_3, self.det_3]
     self.PBSA.add_receiver(self.det_1)
@@ -195,14 +251,14 @@ class BBM92_receiver(nd.Node):
 
 class BBM92_SPDC_source(nd.Node):
 
-  def __init__(self,name="unnamed", freq=10000000.0, tl = Timeline(2e10), receiver_1=None, receiver_2=None):
+  def __init__(self,name="unnamed", freq=1*10**(8), tl = Timeline(2e10), receiver_1=None, receiver_2=None):
     super().__init__(name, tl)
     self.frequency=freq
     self.name=name
     SPDC_name= name +" SPDC_source"
     polarization ={"name": "polarization","bases": [((complex(1), complex(0)), (complex(0), complex(1))),((complex(np.sqrt(1 / 2)), complex(np.sqrt(1 / 2))), (complex(-np.sqrt(1 / 2)), complex(np.sqrt(1 / 2))))]}
 
-    self.SPDC_source = ls.SPDCSource(name=SPDC_name, timeline=tl, frequency=freq, wavelengths=[1550,1550], mean_photon_num=0.1,encoding_type=polarization, phase_error=0)
+    self.SPDC_source = ls.SPDCSource(name=SPDC_name, timeline=tl, frequency=freq, wavelengths=[1550,1550], mean_photon_num=0.01,encoding_type=polarization, phase_error=0)
 
 
 #encoding_type={'bases': [((1 + 0j, 0j), (0j, 1 + 0j)), ((0.7071067811865476 + 0j, 0.7071067811865476 + 0j), (-0.7071067811865476 + 0j, 0.7071067811865476 + 0j))], 'name': 'polarization'}
@@ -236,7 +292,7 @@ def main():
 
   Reg_Alice=Register("BBM92_Reg_Alice")
   Reg_Bob=Register("BBM92_Reg_Bob")
-  runtime = 2e14
+  runtime = 2e20
   sim_time=runtime*10**(-12)
   distance = 1e3
   tl = Timeline(runtime)
@@ -245,12 +301,12 @@ def main():
 #### Defining nodes, Alice and Bob (the receivers) and Charlie (the sender), and quantum channels
   Alice = BBM92_receiver(name="Alice", tl=tl, reg=Reg_Alice)
   Bob = BBM92_receiver(name="Bob", tl=tl, reg=Reg_Bob)
-  qc0 = optch.QuantumChannel("qc0", tl, distance=distance, polarization_fidelity=0.97, attenuation=0.0002)
-  qc1 = optch.QuantumChannel("qc1", tl, distance=distance, polarization_fidelity=0.97, attenuation=0.0002)
+  qc0 = optch.QuantumChannel("qc0", tl, distance=distance, polarization_fidelity=0.99, attenuation=0.0002)
+  qc1 = optch.QuantumChannel("qc1", tl, distance=distance, polarization_fidelity=0.99, attenuation=0.0002)
   Charlie = BBM92_SPDC_source(name="Charlie", tl=tl, receiver_1=Alice, receiver_2=Bob)
   Alice.set_seed(0)
   Bob.set_seed(1)
-  Charlie.set_seed(0)
+  Charlie.set_seed(2)
 
 
 
@@ -269,8 +325,8 @@ def main():
   ############## Defining the processes and events #############
   process = Process(Charlie, "emit_photons", [])
   emission_event=[]
-  for t in range(50):
-    emission_event.append(Event(t+1, process))
+  for t in range(50000):
+    emission_event.append(Event(500*t, process))
 
   for h in range (len(emission_event)):
     tl.schedule(emission_event[h])
@@ -286,7 +342,8 @@ def main():
   results_Alice=Reg_Alice.get_registered_events()
   results_Bob=Reg_Bob.get_registered_events()
 
-  print(results_Alice)
+  #print(results_Alice)
+  #print(results_Bob)
   n_Alice_measurements=len(results_Alice["Time"])
   n_Bob_measurements=len(results_Bob["Time"])
   offset=0
@@ -303,12 +360,12 @@ def main():
 
   start=0
   for i in range (n_Alice_measurements): 
-    for j in range(0,n_Bob_measurements,1):
-      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=31000 and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
+    for j in range(n_Bob_measurements):
+      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=0 and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
         coincident_counts=coincident_counts+1
         Alice_raw_key.append(results_Alice["Det_result"][i])
         Bob_raw_key.append(results_Bob["Det_result"][j])
-        print("ess", i,j, "time difference= ", results_Alice["Time"][i]-results_Bob["Time"][j])
+        #print("ess", i,j, "time difference= ", results_Alice["Time"][i]-results_Bob["Time"][j])
         start=j
         break
 
@@ -330,8 +387,8 @@ def main():
   if coincident_counts==0:
     print("No coincident counts have been detected, therefore QBER cannot be estimated")
   else:
-    QBER=different_counts/coincident_counts
-    print("The QBER is: ", QBER)
+    QBER=(different_counts/coincident_counts)
+    print(f"The QBER is: {QBER:.3f}")
   
 
 

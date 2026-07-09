@@ -16,13 +16,13 @@ Per ora ci sono due  files nella repository. "BB84_test.py" è il test di una si
 Il file "BBM92_simulation.py" simula un protocollo BBM92 con dei nodi di ricezione ed invio creati appositamente. 
 
 Vi sono due classi che costituiscono i due tipi di nodi necessari per il protocollo BBM92.
-"BBM92_SPDC_source" è la classe che contiene l'emettitore di fotoni, in questo caso un cristallo SPDC eccitato con una certa frequenza.
+"BBM92_SPDC_source" è la classe che contiene l'emettitore di fotoni, in questo caso un cristallo SPDC.
 
 "BBM92_receiver" è invece la classe che simula un ricevitore BBM92. Il ricevitore è costituito da un beam splitter 50/50 1X2, due polarizing beam splitter che misurano la polarizzazione dei fotoni nelle diverse basi (base {H,V} e base {+.-}), e 4 detector.
 
-Vi è inoltre una classe chiamata "det_counter" che serve per registrare gli arrivi e le misure dei fotoni, mentre la classe "Register" permette di registrare in un dizionario I risultati delle misure di ognuno dei due nodi, il tempo di arrivo dei fotoni e la base utilizzata per la misura.
+Vi è inoltre una classe chiamata "det_counter" che serve per registrare gli arrivi e le misure dei fotoni, mentre la classe "Register" permette di registrare in un dizionario I risultati delle misure di ognuno dei due nodi, il tempo di arrivo dei fotoni e la base utilizzata per la misura. Vi sono due classi beam splitter che servono per modificare alcuni bug e incongruenze del codice Sequence originario. Il tutto va ancora commentato, ottimizzato e pulito
 
 
 # Stato della Simulazione
 
-Per ora le due classi sono funzionanti ma non connesse. I fotoni vengono emessi ma non viaggiano e non arrivano sui detector. Le misure ottenute dai due osservatori sono registrate. I fotoni  presenti sono tuttavia totalmente scorrelati in quanto sono solo conteggi oscuri. Le chiavi che si ottengono sono ancora completamente scorrelate. Serve ottimizzare anche l'algoritmo di post processing
+Alice, Charlie e Bob sono connessi. La simulazione funziona ma va ancora otimizzata. Vanno inseriti i conteggi oscuri, il rumore dovuto ai canali, e va settata bene la frequenza di emissione. Va inoltre introdotto un file di config che possa rendere più semplice l'inserimento dei parametri vari. Questo è tuttavia il primo prototipo funzionante.
