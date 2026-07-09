@@ -1,0 +1,29 @@
+{
+  "Detector_parameters": {
+
+    "Comment1": "efficienza del detector, numero compreso tra 0 ed 1",
+    "det_eff" :0.35,
+
+    "Comment2": "Conteggi oscuri al secondo",
+    "dark_counts": 5000,
+
+    "Comment3": "Conteggi oscuri al secondo",
+    "count_rate_max":3e18,
+
+    "Comment4": "risoluzione temporale dei detector in picosecondi",
+    "time_resolution": 5000
+
+
+  },
+
+  "emitter_parameters": {
+    "Comment1": "Frequenza di emissione dei fotoni in emissioni/picosecondo",
+    "emitter_frequency": 30e-6
+
+
+  },
+  "general_parameters": {
+    "Commento": "Tempo di simulazione",
+    "runtime" : 5e11
+  }
+}
