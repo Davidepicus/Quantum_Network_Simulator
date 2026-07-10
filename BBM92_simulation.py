@@ -26,8 +26,19 @@ import json
 class Qchannel(optch.QuantumChannel):
   def __init__(self, name="none", timeline=None, attenuation=0, distance=1*10**(3), polarization_fidelity= 1.0, light_speed= 3*10**(-4), frequency= 8e7):
     super().__init__( name=name, timeline=timeline, attenuation=attenuation, distance=distance, polarization_fidelity= polarization_fidelity, light_speed=light_speed, frequency= frequency)
+    self.sender_node=None
+    self.receiver_node=None
 
 
+  def get(self, Photon):
+    self.transmit( source=self.sender_node, qubit=Photon)
+
+
+  def connect(self, sender_node=None, receiver_node=None ):
+    print(sender_node.name, "Has been connected with ", receiver_node.name)
+    self.sender_node=sender_node
+    self.receiver_node=receiver_node
+    self.set_ends(sender_node, receiver_node.name)
 
 ################ redefining correct Polarizing beam splitter class ###########################
 
@@ -35,8 +46,8 @@ class BeamSplitter(BS.FockBeamSplitter2):
    def __init__(self, name_i="none", owner_i=None, tml=None, eff=1, ph_counter=0, source_list=["none"]):
     super().__init__( name=name_i, owner=owner_i, timeline=tml, efficiency=eff, photon_counter=ph_counter, src_list=source_list)
 
-
-   def get(self, source, photon) -> None:
+     ######## get funcion of the beam splitter which overrides the one present in the Sequence files ##########
+   def get(self,source, photon) -> None:
         """Receive photon from one end nodes"""
 
         self.photon_counter += 1
@@ -52,15 +63,10 @@ class BeamSplitter(BS.FockBeamSplitter2):
             #selected_receiver.get_2(photon)
             self.photon_counter=0 
 
-#        elif self.photon_counter == 2:
-            
-#            self._receivers[0].photon_counter = 0
-#            self._receivers[1].photon_counter = 0
-#            self._receivers[0].photon_counter2 = 0
-#            self._receivers[1].photon_counter2 = 0
-#            selected_receiver.getx2(photon)
-#            selected_receiver.get_2x2(photon)
 
+    ######function that receives qubit from a channel and calls the get method for the beam splitter###############
+#   def receive_qubit(self, source_name, qubit):
+#      self.get(source=source_name, photon=qubit)
 
 ################# redifining correct beam splitter class ###################
 
@@ -85,6 +91,8 @@ class PBeamSplitter(BS.BeamSplitter):
     print("get_2x2 called")
     #self.get(photon)
 
+
+  ######## get funcion of the  polarizing beam splitter which overrides the one present in the Sequence files ##########
   def get(self, Photon, **kwargs) -> None:
     """Method to receive a photon for measurement.
 
@@ -226,7 +234,7 @@ class BBM92_receiver(nd.Node):
 
     self.PBSB.set_basis_list([1,1], start_time=0, frequency=1*10**12)
     ######## Connecting the hardware ##################
-    self.set_first_component(self.bs)
+    self.set_first_component(self.bs.name)
     self.bs.add_receiver(self.PBSA)
     self.bs.add_receiver(self.PBSB)
     self.PBSA.add_receiver(self.det_1)
@@ -313,8 +321,8 @@ def main():
   Alice = BBM92_receiver(name="Alice", tl=tl,det_eff=parameters["Detector_parameters"]["det_eff"],dark_counts=parameters["Detector_parameters"]["dark_counts"],count_rate_max=parameters["Detector_parameters"]["count_rate_max"],time_resolution=parameters["Detector_parameters"]["time_resolution"],reg=Reg_Alice)
   Bob = BBM92_receiver(name="Bob", tl=tl, reg=Reg_Bob)
 
-  qc0 = optch.QuantumChannel("qc0", tl, distance=distance, polarization_fidelity=0.99, attenuation=0.0002)
-  qc1 = optch.QuantumChannel("qc1", tl, distance=distance, polarization_fidelity=0.99, attenuation=0.0002)
+  qc0 = Qchannel("qc0", tl, distance=distance, polarization_fidelity=0.99, attenuation=0.0002)
+  qc1 = Qchannel("qc1", tl, distance=distance, polarization_fidelity=0.99, attenuation=0.0002)
   Charlie = BBM92_SPDC_source(name="Charlie", tl=tl, receiver_1=Alice, receiver_2=Bob)
   Alice.set_seed(0)
   Bob.set_seed(1)
@@ -324,13 +332,9 @@ def main():
 
 #### Setting Bob and Alice as the receivers
 
-  qc0.set_ends(Charlie, Alice.name)
-  qc1.set_ends(Charlie, Bob.name)
+  qc0.connect(Charlie, Alice)
+  qc1.connect(Charlie, Bob)
 
-#  cc0 = optch.ClassicalChannel("cc0", tl, distance=distance)
-#  cc1 = optch.ClassicalChannel("cc1", tl, distance=distance)
-#  cc0.set_ends(Alice, Bob.name)
-#  cc1.set_ends(Bob, Alice.name)
 
 
 
@@ -367,7 +371,7 @@ def main():
   print("Number of Alice detections is: ",n_Alice_measurements )
   print("Number of Bob detections is: ",n_Bob_measurements )
 
-  print("### Starting to post processing analysis ###")
+  print("\n","### Starting to post processing analysis ###")
 
   start=0
   for i in range (n_Alice_measurements): 
@@ -383,9 +387,9 @@ def main():
       
     
 
-  print("Number of coincident counts is: ",coincident_counts )
+  print("Total length of the raw key is: ",coincident_counts )
   key_rate=int(coincident_counts/(runtime*10**(-12)))
-  print("Key transmission rate is: " ,key_rate, "Hz")
+  print("Key transmission rate is: " ,key_rate, " Qubit/sec")
 
   correct_counts=0
   different_counts=0
