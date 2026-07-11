@@ -28,4 +28,22 @@ Tutti i parametri della simulazione possono essere introdotti e modificati dal f
 
 # Stato della Simulazione
 
-Alice, Charlie e Bob sono connessi. La simulazione funziona ma va ancora otimizzata. I conteggi oscuri sono stati inseriti, insieme al dead time e al time jitter dei rivelatori. Sono state considerate anche le imperfezioni dei beam splitter. Va inserito il rumore dovuto ai canali. La frequenza di emissione è considerata esternamente . il file di config è stato introdotto per rendere più semplice l'inserimento dei parametri vari. Questo prototipo è funzionante. Un tempo di simulazione congruo è di circa 0.1 secondi
+Alice, Charlie e Bob sono connessi. La simulazione funziona ma va ancora otimizzata. 
+I parametri che possono essere modificati sono:
+
+I conteggi oscuri, il dead time ed il time jitter dei detector.
+
+L'efficienza dei beam splitter 50/50 1X2, e l'efficienza dei polarizing beam splitter.
+
+La frequenza di stimolazione del cristallo SPDC e il valore medio di coppie di fotoni emesse per stimolazione.
+
+Il tempo di simulazione
+
+Tutti questi parametri possono essere modificati dal file di configurazione "config.json". Questo prototipo è funzionante. Un tempo di simulazione consigliato per ottenere risultati plausibili senza aspettare troppo, è di 0.1-0.05 secondi. Alla simulazione manca introdurre gli effetti dovuti ai canali ottici. I lavori sono ancora in corso. Potrebbe essere inoltre necessario migliorare il criterio di post processing delle chiavi grezze.
+
+
+
+
+
+
+

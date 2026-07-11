@@ -191,7 +191,7 @@ class det_counter():
 ################# Class that represents a BBM92 receiver ################################
 class BBM92_receiver(nd.Node):
   
-  def __init__(self,name="unnamed",det_eff=0.35,dark_counts=5000,count_rate_max=3*10**(18),time_resolution= 150, tl = Timeline(2e10), reg=None):
+  def __init__(self,name="unnamed",det_eff=0.35,dark_counts=5000,count_rate_max=3*10**(18),time_resolution= 150, tl = Timeline(2e10), reg=None, PBS_efficiency=0.99, BS_efficiency=0.99):
     ###### detector definition ##############
     super().__init__(name, tl)
     self.reg=reg
@@ -212,27 +212,24 @@ class BBM92_receiver(nd.Node):
     ######## Beam splitter definition ###############
     self.bs_counter=0
     bs_name= name+ "initial_beam_splitter"
-    self.bs=BeamSplitter(name_i=bs_name, owner_i=self.name,  tml=tl, eff=0.99, ph_counter=self.bs_counter, source_list=["Charlie"])
+    self.bs=BeamSplitter(name_i=bs_name, owner_i=self.name,  tml=tl, eff=BS_efficiency, ph_counter=self.bs_counter, source_list=["Charlie"])
     self.add_component(self.bs)
 
     ######### Polarization beam splitter definition, measurement on the Z basis ############
-    # polarization_Z  =[complex(1), complex(0), complex(0), complex(1)]
     PBSA_name= name + "Polarizing_Beam_splitter_A"
-    self.PBSA=PBeamSplitter(name=PBSA_name, timeline=tl, fidelity=0.99)
+    self.PBSA=PBeamSplitter(name=PBSA_name, timeline=tl, fidelity=PBS_efficiency)
     self.add_component(self.PBSA)
-
-    
-
     self.PBSA.set_basis_list([0,0], start_time=0, frequency=1*10**12)
 
     ######### Polarization beam splitter definition, measurement on the x basis ############
-    #polarization_X = [complex(np.sqrt(1 / 2)), complex(np.sqrt(1 / 2)), complex(-np.sqrt(1 / 2)), complex(np.sqrt(1 / 2))] 
     PBSB_name= name + "Polarizing_Beam_splitter_B"
-    self.PBSB=PBeamSplitter(name=PBSB_name, timeline=tl, fidelity=0.99)
+    self.PBSB=PBeamSplitter(name=PBSB_name, timeline=tl, fidelity=PBS_efficiency)
     self.add_component(self.PBSB)
-
-
     self.PBSB.set_basis_list([1,1], start_time=0, frequency=1*10**12)
+
+
+
+
     ######## Connecting the hardware ##################
     self.set_first_component(self.bs.name)
     self.bs.add_receiver(self.PBSA)
@@ -255,6 +252,8 @@ class BBM92_receiver(nd.Node):
     ######### Informing user about creation of the BBM92_receiver  ##########
     print("BBM92_receiver named: ",  self.name ," has been set")
 
+
+  ######redefining get function such that it can obtain photons from other objects ######################## 
   def get(self, photon):
     self.bs.get("Charlie", photon)
 
@@ -262,19 +261,20 @@ class BBM92_receiver(nd.Node):
 
 class BBM92_SPDC_source(nd.Node):
 
-  def __init__(self,name="unnamed", freq=1*10**(8), tl = Timeline(2e10), receiver_1=None, receiver_2=None):
+  def __init__(self,name="unnamed", freq=1*10**(8), tl = Timeline(2e10), receiver_1=None, receiver_2=None, av_pairs=0.1):
     super().__init__(name, tl)
     self.frequency=freq
     self.name=name
     SPDC_name= name +" SPDC_source"
     polarization ={"name": "polarization","bases": [((complex(1), complex(0)), (complex(0), complex(1))),((complex(np.sqrt(1 / 2)), complex(np.sqrt(1 / 2))), (complex(-np.sqrt(1 / 2)), complex(np.sqrt(1 / 2))))]}
 
-    self.SPDC_source = ls.SPDCSource(name=SPDC_name, timeline=tl, frequency=freq, wavelengths=[1550,1550], mean_photon_num=0.01,encoding_type=polarization, phase_error=0)
+    self.SPDC_source = ls.SPDCSource(name=SPDC_name, timeline=tl, frequency=freq, wavelengths=[1550,1550], mean_photon_num=av_pairs,encoding_type=polarization, phase_error=0)
 
 
-#encoding_type={'bases': [((1 + 0j, 0j), (0j, 1 + 0j)), ((0.7071067811865476 + 0j, 0.7071067811865476 + 0j), (-0.7071067811865476 + 0j, 0.7071067811865476 + 0j))], 'name': 'polarization'}
-
+    ###### attaching the SPDC_source to the node ########
     self.add_component(self.SPDC_source)
+
+    ####### attaching the SPDC source to the receiver   #######################
     self.receiver_1=receiver_1
     self.receiver_2=receiver_2
     self.SPDC_source.add_receiver(self.receiver_1)
@@ -283,17 +283,13 @@ class BBM92_SPDC_source(nd.Node):
     ######### Informing user about creation of the BBM92_SPDC_emitter  ##########
     print("BBM92_SPDC_source named: ",  self.name ," has been set")
 
-
+  ######### function that calls the SPDC source and tells it to excite the SPDC crystal ###################
   def emit_photons(self):
     c = 1 / mt.sqrt(2)
     phi_plus = [c + 0j, c + 0j]
     self.SPDC_source.emit( [phi_plus])
 
-
-  def get_frequency(self):
-    return self.frequency
-
-         
+   
 
 
 
@@ -308,8 +304,19 @@ def main():
   Reg_Alice=Register("BBM92_Reg_Alice")
   Reg_Bob=Register("BBM92_Reg_Bob")
 
-  runtime =parameters["general_parameters"]["runtime"] #*(10)**(10)
-  emission_frequency=parameters["emitter_parameters"]["emitter_frequency"] ###30*10**(-6) ###in numbers of emission per picoseconds
+   ############ getting parameters from the json file ######################
+  runtime =parameters["general_parameters"]["runtime"]*(10)**(12)
+  emission_frequency=parameters["emitter_parameters"]["emitter_frequency"]*10**(-12) ###in numbers of emission per picoseconds
+  average_pairs=parameters["emitter_parameters"]["av_ph_emitted"]
+  detector_efficiency=parameters["Detector_parameters"]["det_eff"]
+  dark_counts=parameters["Detector_parameters"]["dark_counts"]
+  count_rate_max=parameters["Detector_parameters"]["count_rate_max"]
+  time_resolution=parameters["Detector_parameters"]["time_resolution"]
+  PBS_eff=parameters["Detector_parameters"]["PBS_efficiency"]
+  BS_eff=parameters["Detector_parameters"]["Beam_splitter_efficiency"]
+
+
+  ########### setting up the parameters #################
   number_of_emissions=int(emission_frequency*runtime)-1
   emission_period=(int(1/emission_frequency))
   sim_time=runtime*10**(-12)
@@ -317,13 +324,14 @@ def main():
   tl = Timeline(runtime)
   tl.show_progress = True
 
-#### Defining nodes, Alice and Bob (the receivers) and Charlie (the sender), and quantum channels
-  Alice = BBM92_receiver(name="Alice", tl=tl,det_eff=parameters["Detector_parameters"]["det_eff"],dark_counts=parameters["Detector_parameters"]["dark_counts"],count_rate_max=parameters["Detector_parameters"]["count_rate_max"],time_resolution=parameters["Detector_parameters"]["time_resolution"],reg=Reg_Alice)
-  Bob = BBM92_receiver(name="Bob", tl=tl, reg=Reg_Bob)
+#### Defining nodes, Alice and Bob (the receivers) and Charlie (the sender), and quantum channels ################
+  Alice = BBM92_receiver(name="Alice", tl=tl,det_eff=detector_efficiency, dark_counts=dark_counts, count_rate_max=count_rate_max, time_resolution=time_resolution, reg=Reg_Alice, PBS_efficiency=PBS_eff, BS_efficiency=BS_eff)
+  
+  Bob = BBM92_receiver(name="Bob",  tl=tl,det_eff=detector_efficiency, dark_counts=dark_counts ,count_rate_max=count_rate_max ,time_resolution=time_resolution, reg=Reg_Bob,PBS_efficiency=PBS_eff, BS_efficiency=BS_eff)
 
   qc0 = Qchannel("qc0", tl, distance=distance, polarization_fidelity=0.99, attenuation=0.0002)
   qc1 = Qchannel("qc1", tl, distance=distance, polarization_fidelity=0.99, attenuation=0.0002)
-  Charlie = BBM92_SPDC_source(name="Charlie", tl=tl, receiver_1=Alice, receiver_2=Bob)
+  Charlie = BBM92_SPDC_source(name="Charlie", tl=tl, receiver_1=Alice, receiver_2=Bob, av_pairs=average_pairs)
   Alice.set_seed(0)
   Bob.set_seed(1)
   Charlie.set_seed(2)
@@ -373,17 +381,19 @@ def main():
 
   print("\n","### Starting to post processing analysis ###")
 
+
+  
   start=0
   for i in range (n_Alice_measurements): 
     for j in range(start,n_Bob_measurements,1):
-      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=parameters["Detector_parameters"]["time_resolution"] and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
+      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
         coincident_counts=coincident_counts+1
         Alice_raw_key.append(results_Alice["Det_result"][i])
         Bob_raw_key.append(results_Bob["Det_result"][j])
-        #print("ess", i,j, "time difference= ", results_Alice["Time"][i]-results_Bob["Time"][j])
         start=j
         break
-
+      elif np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)> 100000*time_resolution:
+        break
       
     
 
