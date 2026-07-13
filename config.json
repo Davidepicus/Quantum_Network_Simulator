@@ -7,7 +7,7 @@
     "Parametro_2": "Conteggi oscuri al secondo",
     "dark_counts": 5000,
 
-    "Parametro_3": "Conteggi oscuri al picosecondo",
+    "Parametro_3": "Conteggi massimi al picosecondo (l'inverso del dead time del detector)",
     "count_rate_max":3e18,
 
     "Parametro_4": "risoluzione temporale dei detector in picosecondi",
@@ -24,15 +24,36 @@
 
   "emitter_parameters": {
     "Parametro_1": "Frequenza di stimolazione del  in Hz",
-    "emitter_frequency": 30e6,
+    "emitter_frequency": 80e6,
 
     "Parametro_2": "Numero medio di coppie di fotoni emesse per ogni stimolazione1",
     "av_ph_emitted": 0.03
 
 
   },
+
+
+ "channel_parameters": {
+    "Parametro_1": "Distanza Charlie Alice in metri",
+    "d_CA": 7e3,
+
+    "Parametro_2": "Distanza Charlie Bob in metri",
+    "d_CB": 3e3,
+
+    "Parametro_3": "Attenuazione canale Charlie Alice in db/m ",
+    "att_CA": 0.00035,
+
+    "Parametro_4": "Attenuazione canale Charlie Bob in db/m ",
+    "att_CB": 0.00035,
+
+    "Parametro_5": "Velocità della luce nel mezzo, espressa come frazione della velocità della luce",
+    "light_speed": 1
+
+  },
+
+
   "general_parameters": {
     "Commento": "Tempo di simulazione in secondi",
-    "runtime" : 0.05
+    "runtime" : 0.008
   }
 }

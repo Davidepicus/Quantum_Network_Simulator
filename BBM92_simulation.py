@@ -16,22 +16,208 @@ from sequence.components.memory import Memory
 import sequence.utils.log as log
 import random
 import json
+from sequence.components.photon import Photon
+from scipy import constants
+
+
+
+
+#################### redefining SPDC_source #####################
+
+"""
+class SPDC_Crystal(ls.SPDCSource):
+  def __init__(self, name, timeline, frequency, wavelengths, mean_photon_num,encoding_type, phase_error=0):
+    super().__init__(name=name, timeline=timeline, frequency=frequency, wavelengths=wavelengths, mean_photon_num=mean_photon_num,encoding_type=encoding_type, phase_error=phase_error)
+
+
+
+  def emit(self, state_list):
+
+        """"""Method to emit photons.
+
+        Will emit photons for a length of time determined by the `state_list` parameter.
+        The number of photons emitted per period is calculated as a poisson random variable.
+
+        Arguments:
+            state_list (list[list[complex]]): list of complex coefficient arrays to send as photon-encoded qubits.
+                This is ignored for absorptive and Fock encoding types.
+                For these encoding types only the length of list matters and elements can be arbitrary.
+        """"""
+
+        log.logger.info(f"SPDC sourcee {self.name} emitting {len(state_list)} photons")
+
+        time = self.timeline.now()
+
+        if self.encoding_type["name"] == "fock":
+            # Use Fock encoding.
+            # The two generated photons should be entangled and should have keys pointing to same Fock state.
+            for _ in state_list:
+                # generate two new photons
+                new_photon0 = Photon("", self.timeline,
+                                     wavelength=self.wavelengths[0],
+                                     location=self,
+                                     encoding_type=self.encoding_type,
+                                     use_qm=True)
+                new_photon1 = Photon("", self.timeline,
+                                     wavelength=self.wavelengths[1],
+                                     location=self,
+                                     encoding_type=self.encoding_type,
+                                     use_qm=True)
+
+                # set shared state to squeezed state
+                state = self._generate_tmsv_state()
+                keys = [new_photon0.quantum_state, new_photon1.quantum_state]
+                self.timeline.quantum_manager.set(keys, state)
+
+                self.send_photons(time, [new_photon0, new_photon1])
+                self.photon_counter += 1
+                time += 1e12 / self.frequency
+
+        elif self.encoding_type["name"] == "absorptive":
+            for _ in state_list:
+                num_photon_pairs = self.get_generator().poisson(self.mean_photon_num)
+
+                for _ in range(num_photon_pairs):
+                    new_photon0 = Photon("", self.timeline,
+                                         wavelength=self.wavelengths[0],
+                                         location=self,
+                                         encoding_type=self.encoding_type,
+                                         use_qm=True)
+                    new_photon1 = Photon("", self.timeline,
+                                         wavelength=self.wavelengths[1],
+                                         location=self,
+                                         encoding_type=self.encoding_type,
+                                         use_qm=True)
+
+                    new_photon0.combine_state(new_photon1)
+                    new_photon0.set_state((complex(0), complex(0), complex(0), complex(1)))
+                    self.send_photons(time, [new_photon0, new_photon1])
+                    self.photon_counter += 1
+
+                if num_photon_pairs == 0:
+                    # send two null photons for purposes of entanglement
+                    new_photon0 = Photon("", self.timeline,
+                                         wavelength=self.wavelengths[0],
+                                         location=self,
+                                         encoding_type=self.encoding_type,
+                                         use_qm=True)
+                    new_photon1 = Photon("", self.timeline,
+                                         wavelength=self.wavelengths[1],
+                                         location=self,
+                                         encoding_type=self.encoding_type,
+                                         use_qm=True)
+
+                    new_photon0.is_null = True
+                    new_photon1.is_null = True
+                    new_photon0.combine_state(new_photon1)
+                    new_photon0.set_state((complex(1), complex(0), complex(0), complex(0)))
+                    self.send_photons(time, [new_photon0, new_photon1])
+
+                time += 1e12 / self.frequency
+
+        else:
+            for state in state_list:
+                num_photon_pairs = self.get_generator().poisson(
+                self.mean_photon_num)
+
+                if self.get_generator().random() < self.phase_error:
+                    state = multiply([1, -1], state)
+
+                for _ in range(num_photon_pairs):
+                    new_photon0 = Photon("", self.timeline,
+                                         wavelength=self.wavelengths[0],
+                                         location=self,
+                                         encoding_type=self.encoding_type)
+                    new_photon1 = Photon("", self.timeline,
+                                         wavelength=self.wavelengths[1],
+                                         location=self,
+                                         encoding_type=self.encoding_type)
+
+
+#                    new_photon0.state_index = 0
+#                    new_photon1.state_index = 1
+                    new_photon0.combine_state(new_photon1)
+                    new_photon0.set_state((state[0], complex(0), complex(0), state[1]))
+                    self.send_photons(time, [new_photon0, new_photon1])
+                    self.photon_counter += 1
+
+                time += 1e12 / self.frequency
+
+
+
+"""
 
 
 
 ################ Redefining quantum channel ################################
-
-#optch.QuantumChannel("qc0", tl, distance=distance, polarization_fidelity=0.99, attenuation=0.0002)
 
 class Qchannel(optch.QuantumChannel):
   def __init__(self, name="none", timeline=None, attenuation=0, distance=1*10**(3), polarization_fidelity= 1.0, light_speed= 3*10**(-4), frequency= 8e7):
     super().__init__( name=name, timeline=timeline, attenuation=attenuation, distance=distance, polarization_fidelity= polarization_fidelity, light_speed=light_speed, frequency= frequency)
     self.sender_node=None
     self.receiver_node=None
+    self.frequency=8e12
 
 
-  def get(self, Photon):
-    self.transmit( source=self.sender_node, qubit=Photon)
+  def get(self, photon):
+        source=self.sender_node
+        """Method to transmit photon-encoded qubits.
+
+        Args:
+            qubit (Photon): photon to be transmitted.
+
+        Side Effects:
+            Receiver node may receive the qubit (via the `receive_qubit` method).
+        """
+        
+#        log.logger.info("{} send qubit with state {} to {} by Channel {}".format(self.sender.name, qubit.quantum_state, self.receiver, self.name))
+
+        assert self.delay >= 0 and self.loss <= 1, f"QuantumChannel init() function has not been run for {self.name}"
+#        assert source == self.sender
+
+        # remove lowest time bin
+        if len(self.send_bins) > 0:
+            time = -1
+            while time < self.timeline.now():
+                time_bin = hq.heappop(self.send_bins)
+                time = self.timebin_to_time(time_bin, self.frequency)
+            assert time == self.timeline.now(), f"qc {self.name} transmit method called at invalid time"
+
+        # check if photon state using Fock representation
+        if photon.encoding_type["name"] == "fock":
+            key = photon.quantum_state  # if using Fock representation, the `quantum_state` field is the state key.
+            # apply loss channel on photonic statex
+            self.timeline.quantum_manager.add_loss(key, self.loss)
+
+            # schedule receiving node to receive photon at future time determined by light speed
+            future_time = self.timeline.now() + self.delay
+            process = Process(self.receiver, "receive_qubit", [source.name, photon])
+            event = Event(future_time, process)
+            self.timeline.schedule(event)
+
+        # if not using Fock representation, check if photon kept
+        elif (self.sender.get_generator().random() > self.loss) or photon.is_null:
+            if self._receiver_on_other_tl():
+                self.timeline.quantum_manager.move_manage_to_server(photon.quantum_state)
+
+            if photon.is_null:
+                photon.add_loss(self.loss)
+
+            # check if polarization encoding and apply necessary noise
+            if photon.encoding_type["name"] == "polarization" and self.sender.get_generator().random() > self.polarization_fidelity:
+                print("phass")
+                photon.random_noise(self.get_generator())
+            
+            # schedule receiving node to receive photon at future time determined by light speed
+            future_time = self.timeline.now() + self.delay
+            process = Process(self.receiver, "receive_qubit", [source.name, photon])
+            event = Event(future_time, process)
+            self.timeline.schedule(event)
+
+        # if not using Fock representation, if photon lost, exit
+        else:
+            pass
+ 
 
 
   def connect(self, sender_node=None, receiver_node=None ):
@@ -47,7 +233,7 @@ class BeamSplitter(BS.FockBeamSplitter2):
     super().__init__( name=name_i, owner=owner_i, timeline=tml, efficiency=eff, photon_counter=ph_counter, src_list=source_list)
 
      ######## get funcion of the beam splitter which overrides the one present in the Sequence files ##########
-   def get(self,source, photon) -> None:
+   def get(self, photon):
         """Receive photon from one end nodes"""
 
         self.photon_counter += 1
@@ -77,9 +263,9 @@ class PBeamSplitter(BS.BeamSplitter):
     self.con=0
 
   def get_2(self, photon):
-    #self.con=self.con+1
+    self.con=self.con+1
     #print("get_2 called")
-    self.get(photon)
+    #self.get(photon)
 
   def getx2(self, photon):
     self.con=self.con+1
@@ -93,7 +279,7 @@ class PBeamSplitter(BS.BeamSplitter):
 
 
   ######## get funcion of the  polarizing beam splitter which overrides the one present in the Sequence files ##########
-  def get(self, Photon, **kwargs) -> None:
+  def get(self, photon):
     """Method to receive a photon for measurement.
 
         Args:
@@ -103,7 +289,7 @@ class PBeamSplitter(BS.BeamSplitter):
             May call get method of one receiver.
         """
 
-    assert Photon.encoding_type["name"] == "polarization", "Beamsplitter should only be used with polarization."
+    assert photon.encoding_type["name"] == "polarization", "Beamsplitter should only be used with polarization."
 
     if self.get_generator().random() < self.fidelity: 
       #index = int((self.timeline.now() - self.start_time) * self.frequency * 1e-12)
@@ -111,9 +297,9 @@ class PBeamSplitter(BS.BeamSplitter):
       if 0 > index or index >= len(self.basis_list):
           return
       else:
-        res = Photon.measure(Photon.encoding_type["bases"][self.basis_list[index]],Photon, self.get_generator())
+        res = photon.measure(photon.encoding_type["bases"][self.basis_list[index]],photon, self.get_generator())
         #print(self._receivers)
-        self._receivers[res].get(Photon)
+        self._receivers[res].get(photon)
 
 
 
@@ -255,7 +441,7 @@ class BBM92_receiver(nd.Node):
 
   ######redefining get function such that it can obtain photons from other objects ######################## 
   def get(self, photon):
-    self.bs.get("Charlie", photon)
+    self.bs.get( photon)
 
 ############### class that represents a BBM92 source ###################################
 
@@ -285,12 +471,11 @@ class BBM92_SPDC_source(nd.Node):
 
   ######### function that calls the SPDC source and tells it to excite the SPDC crystal ###################
   def emit_photons(self):
-    c = 1 / mt.sqrt(2)
-    phi_plus = [c + 0j, c + 0j]
-    self.SPDC_source.emit( [phi_plus])
-
-   
-
+        c = 1 / mt.sqrt(2)
+        phi_plus = [c + 0j, c + 0j]
+        state_list=phi_plus
+        self.SPDC_source.emit( [phi_plus])
+        
 
 
 ##################### main program definition ############################
@@ -314,13 +499,16 @@ def main():
   time_resolution=parameters["Detector_parameters"]["time_resolution"]
   PBS_eff=parameters["Detector_parameters"]["PBS_efficiency"]
   BS_eff=parameters["Detector_parameters"]["Beam_splitter_efficiency"]
-
+  distance_CA = parameters["channel_parameters"]["d_CA"]
+  distance_CB = parameters["channel_parameters"]["d_CB"]
+  ch_attenuationCA= parameters["channel_parameters"]["att_CA"]
+  ch_attenuationCB= parameters["channel_parameters"]["att_CB"]
+  LS=constants.speed_of_light*parameters["channel_parameters"]["light_speed"]*10**(-12)
 
   ########### setting up the parameters #################
   number_of_emissions=int(emission_frequency*runtime)-1
   emission_period=(int(1/emission_frequency))
   sim_time=runtime*10**(-12)
-  distance = 1e3
   tl = Timeline(runtime)
   tl.show_progress = True
 
@@ -329,9 +517,9 @@ def main():
   
   Bob = BBM92_receiver(name="Bob",  tl=tl,det_eff=detector_efficiency, dark_counts=dark_counts ,count_rate_max=count_rate_max ,time_resolution=time_resolution, reg=Reg_Bob,PBS_efficiency=PBS_eff, BS_efficiency=BS_eff)
 
-  qc0 = Qchannel("qc0", tl, distance=distance, polarization_fidelity=0.99, attenuation=0.0002)
-  qc1 = Qchannel("qc1", tl, distance=distance, polarization_fidelity=0.99, attenuation=0.0002)
-  Charlie = BBM92_SPDC_source(name="Charlie", tl=tl, receiver_1=Alice, receiver_2=Bob, av_pairs=average_pairs)
+  qc0 = Qchannel("qc0", tl, distance=distance_CA, polarization_fidelity=1, attenuation=ch_attenuationCA,light_speed=LS)
+  qc1 = Qchannel("qc1", tl, distance=distance_CB, polarization_fidelity=1, attenuation=ch_attenuationCB, light_speed=LS)
+  Charlie = BBM92_SPDC_source(name="Charlie", tl=tl, receiver_1=qc0, receiver_2=qc1, av_pairs=average_pairs)
   Alice.set_seed(0)
   Bob.set_seed(1)
   Charlie.set_seed(2)
@@ -369,7 +557,7 @@ def main():
 
   n_Alice_measurements=len(results_Alice["Time"])
   n_Bob_measurements=len(results_Bob["Time"])
-  offset=0
+  offset=(distance_CA-distance_CB)/LS
   coincident_counts=0 
   Alice_raw_key=[]
   Bob_raw_key=[]

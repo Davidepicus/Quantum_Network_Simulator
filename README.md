@@ -1,4 +1,4 @@
-# Hello
+# Benvenuti
 
 Questa è la repository di Github per quantum network simulator. Il pacchetto usato è SeQUeNCe.
 
@@ -21,7 +21,7 @@ Vi sono due classi che costituiscono i due tipi di nodi necessari per il protoco
 
 "BBM92_receiver" è invece la classe che simula un ricevitore BBM92. Il ricevitore è costituito da un beam splitter 50/50 1X2, due polarizing beam splitter che misurano la polarizzazione dei fotoni nelle diverse basi (base {H,V} e base {+.-}), e 4 detector.
 
-Vi è inoltre una classe chiamata "det_counter" che serve per registrare gli arrivi e le misure dei fotoni, mentre la classe "Register" permette di registrare in un dizionario i risultati delle misure di ognuno dei due nodi, il tempo di arrivo dei fotoni e la base utilizzata per la misura. Vi sono due classi beam splitter che servono per modificare alcuni bug e incongruenze del codice Sequence originario.
+Vi è inoltre una classe chiamata "det_counter" che serve per registrare gli arrivi e le misure dei fotoni, mentre la classe "Register" permette di registrare in un dizionario i risultati delle misure di ognuno dei due nodi, il tempo di arrivo dei fotoni e la base utilizzata per la misura. Vi sono due classi beam splitter che servono per modificare alcuni bug e incongruenze del codice Sequence originario. Una terza classe chiamata qChannel, è presente al fine di ridefinire il modo in cui si connettono i canali con i nodi.
 
 # Stato della Simulazione
 
@@ -34,9 +34,13 @@ L'efficienza dei beam splitter 50/50 1X2, e l'efficienza dei polarizing beam spl
 
 La frequenza di stimolazione del cristallo SPDC e il valore medio di coppie di fotoni emesse per stimolazione.
 
-Il tempo di simulazione
+L'attenuazione dei canali quantistici, e la velocità della luce in essi
 
-Tutti questi parametri possono essere modificati dal file di configurazione "config.json". Questo prototipo è funzionante. Un tempo di simulazione consigliato per ottenere risultati plausibili senza aspettare troppo, è di 0.1-0.05 secondi. Alla simulazione manca introdurre gli effetti dovuti ai canali ottici. I lavori sono ancora in corso. Potrebbe essere inoltre necessario migliorare il criterio di post processing delle chiavi grezze.
+Il tempo di simulazione e la distanza tra i vari nodi
+
+Tutti questi parametri possono essere modificati dal file di configurazione "config.json". Questo prototipo è funzionante. Un tempo di simulazione consigliato per ottenere risultati plausibili senza aspettare troppo, è di 0.005-0.01 secondi. 
+
+Manca l'inserimento degli effetti dovuti alla depolarizzazione dei fotoni all'interno dei canali quantistici. La risoluzione di questo problema tuttavia dovrebbe essere complicata. Potrebbe essere inoltre necessario migliorare il criterio di post processing delle chiavi grezze.
 
 
 
