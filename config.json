@@ -24,10 +24,10 @@
 
   "emitter_parameters": {
     "Parametro_1": "Frequenza di stimolazione del  in Hz",
-    "emitter_frequency": 80e6,
+    "emitter_frequency": 60e6,
 
     "Parametro_2": "Numero medio di coppie di fotoni emesse per ogni stimolazione1",
-    "av_ph_emitted": 0.03
+    "av_ph_emitted": 0.1
 
 
   },
@@ -35,10 +35,10 @@
 
  "channel_parameters": {
     "Parametro_1": "Distanza Charlie Alice in metri",
-    "d_CA": 7e3,
+    "d_CA": 20e3,
 
     "Parametro_2": "Distanza Charlie Bob in metri",
-    "d_CB": 3e3,
+    "d_CB": 15e3,
 
     "Parametro_3": "Attenuazione canale Charlie Alice in db/m ",
     "att_CA": 0.00035,
@@ -54,6 +54,6 @@
 
   "general_parameters": {
     "Commento": "Tempo di simulazione in secondi",
-    "runtime" : 0.008
+    "runtime" : 0.01
   }
 }
