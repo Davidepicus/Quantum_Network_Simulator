@@ -18,7 +18,8 @@ import random
 import json
 from sequence.components.photon import Photon
 from scipy import constants
-
+import pandas as pd
+from datetime import datetime
 
 
 
@@ -219,12 +220,42 @@ class Qchannel(optch.QuantumChannel):
             pass
  
 
-
+  ######## function which connects the nodes to the channel ############
   def connect(self, sender_node=None, receiver_node=None ):
     print(sender_node.name, "Has been connected with ", receiver_node.name)
     self.sender_node=sender_node
     self.receiver_node=receiver_node
     self.set_ends(sender_node, receiver_node.name)
+
+
+
+
+  ##### function to update distance and attenuation of the channels #######
+  def update_channel(self, dist=-1, absor=-1):
+    if dist<0 or absor<0 :
+      print("Error, either distance value or absorption are invalid, parameters have not been changed")
+    else:
+      self.distance=dist
+      self.attenuation=absor/dist
+
+
+
+
+  def reset_distance(self, dist=-1):
+    if dist<0:
+      print("Error, distance value is invalid, distance has not been changed")
+    else:
+      self.distance=dist
+
+
+  def reset_absorption(self, absor=-1):
+    if absor<0:
+      print("Error, absorption value is invalid, absorption has not been changed")
+    else:
+      self.attenuation=absor
+
+
+
 
 ################ redefining correct Polarizing beam splitter class ###########################
 
@@ -489,7 +520,52 @@ def main():
   Reg_Alice=Register("BBM92_Reg_Alice")
   Reg_Bob=Register("BBM92_Reg_Bob")
 
-   ############ getting parameters from the json file ######################
+
+  ##### importing orbits ###########
+  # Carica i CSV
+  df_lijiang = pd.read_csv("lijiang_micius.csv")
+  df_delingha = pd.read_csv("delingha_micius.csv")
+
+  # Unisci i due DataFrame per calcolare il tempo globale
+  df_all = pd.concat([df_lijiang, df_delingha], ignore_index=True)
+
+  # Converte Date+Time in datetime assoluto
+  def to_datetime(row):
+      return datetime.strptime(
+          row["Date"] + " " + row["Time"],
+          "%d %b %Y %H:%M:%S.%f"
+      )
+
+  df_all["Datetime"] = df_all.apply(to_datetime, axis=1)
+
+  # Trova il primo timestamp assoluto
+  t0 = df_all["Datetime"].min()
+
+  # Calcola i secondi dall'inizio della prima giornata
+  df_all["SecondsFromStart"] = (df_all["Datetime"] - t0).dt.total_seconds()
+
+  # Ora ri-separa i DataFrame sincronizzati
+  df_lijiang = df_all[df_all["Azimuth"].isin(df_lijiang["Azimuth"])].copy()
+  df_delingha = df_all[df_all["Azimuth"].isin(df_delingha["Azimuth"])].copy()
+
+  def atmospheric_attenuation_1550(elev_deg, alpha0_db=0.1):
+      elev_rad = np.deg2rad(elev_deg)
+      airmass = 1.0 / np.sin(elev_rad)
+      return alpha0_db * airmass
+
+  # Applica il modello a entrambe le stazioni
+  df_lijiang["AtmosphericLoss_dB"] = df_lijiang["Elevation"].apply(atmospheric_attenuation_1550)
+  df_delingha["AtmosphericLoss_dB"] = df_delingha["Elevation"].apply(atmospheric_attenuation_1550)
+
+#  print(df_lijiang)
+#  print(df_delingha)
+
+  Alice_orb_dict = df_lijiang.to_dict(orient="list")
+  Bob_orb_dict = df_delingha.to_dict(orient="list")
+
+
+
+  ############# getting parameters from the json file ######################
   runtime =parameters["general_parameters"]["runtime"]*(10)**(12)
   emission_frequency=parameters["emitter_parameters"]["emitter_frequency"]*10**(-12) ###in numbers of emission per picoseconds
   average_pairs=parameters["emitter_parameters"]["av_ph_emitted"]
@@ -499,16 +575,16 @@ def main():
   time_resolution=parameters["Detector_parameters"]["time_resolution"]
   PBS_eff=parameters["Detector_parameters"]["PBS_efficiency"]
   BS_eff=parameters["Detector_parameters"]["Beam_splitter_efficiency"]
-  distance_CA = parameters["channel_parameters"]["d_CA"]
-  distance_CB = parameters["channel_parameters"]["d_CB"]
-  ch_attenuationCA= parameters["channel_parameters"]["att_CA"]
-  ch_attenuationCB= parameters["channel_parameters"]["att_CB"]
+  distance_CA = 1
+  distance_CB = 1
+  ch_attenuationCA= 100000
+  ch_attenuationCB= 100000
   LS=constants.speed_of_light*parameters["channel_parameters"]["light_speed"]*10**(-12)
-
   ########### setting up the parameters #################
   number_of_emissions=int(emission_frequency*runtime)-1
   emission_period=(int(1/emission_frequency))
   sim_time=runtime*10**(-12)
+  print("The script will simulate events up to : ", sim_time, " Seconds")
   tl = Timeline(runtime)
   tl.show_progress = True
 
@@ -535,10 +611,25 @@ def main():
 
 
   ############## Defining the processes and events #############
-  process = Process(Charlie, "emit_photons", [])
+  emission_process = Process(Charlie, "emit_photons", [])
   emission_event=[]
+
+
+
+  for i in range(len(Alice_orb_dict["SecondsFromStart"])):
+    CA_channel_update_process= Process(qc0, "update_channel", [Alice_orb_dict["Range"][i]*10**(3) ,Alice_orb_dict["AtmosphericLoss_dB"][i]])
+    CA_channel_update_event = Event(Alice_orb_dict["SecondsFromStart"][i], CA_channel_update_process)
+    tl.schedule(CA_channel_update_event)
+
+
+  for i in range(len(Bob_orb_dict["SecondsFromStart"])):
+    CB_channel_update_process= Process(qc1, "update_channel", [Bob_orb_dict["Range"][i]*10**(3) ,Bob_orb_dict["AtmosphericLoss_dB"][i]])
+    CB_channel_update_event = Event(Bob_orb_dict["SecondsFromStart"][i], CB_channel_update_process)
+    tl.schedule(CB_channel_update_event)
+
+
   for t in range(number_of_emissions):
-    emission_event.append(Event(emission_period*t, process))
+    emission_event.append(Event(emission_period*t, emission_process))
 
   for h in range (len(emission_event)):
     tl.schedule(emission_event[h])
@@ -557,22 +648,45 @@ def main():
 
   n_Alice_measurements=len(results_Alice["Time"])
   n_Bob_measurements=len(results_Bob["Time"])
-  offset=(distance_CA-distance_CB)/LS
+  offsets={"Update_time":[], "Distance":[]}
   coincident_counts=0 
   Alice_raw_key=[]
   Bob_raw_key=[]
 
+  ##### Finding all the time offsets ####
 
-  print("\n\n")
-  print("Number of Alice detections is: ",n_Alice_measurements )
-  print("Number of Bob detections is: ",n_Bob_measurements )
+  time_for_off=0
+  a=0
+  b=0
+  while time_for_off<=sim_time and a<len(Alice_orb_dict["SecondsFromStart"]) and b<len(Bob_orb_dict["SecondsFromStart"]):
+    if Alice_orb_dict["SecondsFromStart"][a]>=time_for_off:
+      offsets["Distance"]=offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/(LS*10**(9)))
+      offsets["Update_time"]=offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a])
+      a=a+1
+    elif Bob_orb_dict["SecondsFromStart"][b]>=time_for_off:
+      offsets["Distance"]=offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/(LS*10**(9)))
+      offsets["Update_time"]=offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a])
+      b=b+1
+    time_for_off=time_for_off+0.5
 
-  print("\n","### Starting to post processing analysis ###")
 
 
-  
+
+  print(offsets)
+
+
+ 
   start=0
+  k=0
   for i in range (n_Alice_measurements): 
+    if offsets["Update_time"][k]>results_Alice["Time"][i]: 
+      offset=offsets["Distance"][k]
+    else:
+      k=k+1
+      offset=offsets["Distance"][k]
+
+
+
     for j in range(start,n_Bob_measurements,1):
       if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
         coincident_counts=coincident_counts+1

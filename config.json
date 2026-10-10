@@ -24,10 +24,10 @@
 
   "emitter_parameters": {
     "Parametro_1": "Frequenza di stimolazione del  in Hz",
-    "emitter_frequency": 60e6,
+    "emitter_frequency": 60e2,
 
     "Parametro_2": "Numero medio di coppie di fotoni emesse per ogni stimolazione1",
-    "av_ph_emitted": 0.1
+    "av_ph_emitted": 0.3
 
 
   },
@@ -54,6 +54,6 @@
 
   "general_parameters": {
     "Commento": "Tempo di simulazione in secondi",
-    "runtime" : 0.01
+    "runtime" : 0.1
   }
 }
