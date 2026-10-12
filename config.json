@@ -54,6 +54,6 @@
 
   "general_parameters": {
     "Commento": "Tempo di simulazione in secondi",
-    "runtime" : 0.1
+    "runtime" : 200
   }
 }

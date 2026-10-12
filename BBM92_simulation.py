@@ -557,13 +557,14 @@ def main():
   df_lijiang["AtmosphericLoss_dB"] = df_lijiang["Elevation"].apply(atmospheric_attenuation_1550)
   df_delingha["AtmosphericLoss_dB"] = df_delingha["Elevation"].apply(atmospheric_attenuation_1550)
 
-#  print(df_lijiang)
-#  print(df_delingha)
-
+  ## defining normal dictionaries from Pandas Dataframes
   Alice_orb_dict = df_lijiang.to_dict(orient="list")
   Bob_orb_dict = df_delingha.to_dict(orient="list")
 
 
+  ### rewriting the ranges in meters instead of kilometers ################
+  Alice_orb_dict["Range"]=Alice_orb_dict["Range"]*10**(3)
+  Alice_orb_dict["Range"]=Alice_orb_dict["Range"]*10**(3)
 
   ############# getting parameters from the json file ######################
   runtime =parameters["general_parameters"]["runtime"]*(10)**(12)
@@ -579,7 +580,7 @@ def main():
   distance_CB = 1
   ch_attenuationCA= 100000
   ch_attenuationCB= 100000
-  LS=constants.speed_of_light*parameters["channel_parameters"]["light_speed"]*10**(-12)
+  LS=constants.speed_of_light*parameters["channel_parameters"]["light_speed"]*10**(-12) ##light speed expresses in meters per picosecond
   ########### setting up the parameters #################
   number_of_emissions=int(emission_frequency*runtime)-1
   emission_period=(int(1/emission_frequency))
@@ -601,6 +602,72 @@ def main():
   Charlie.set_seed(2)
 
 
+  start=[] #times at which the emitter should start emitting as the satellite can se both of the receivers
+  stop=[] #times at which the emitter should stop emitting as the satellite cannot see at least one of the receivers
+  start.append(max(Alice_orb_dict["SecondsFromStart"][0], Alice_orb_dict["SecondsFromStart"][0])) #instant of coincident visibility
+
+
+  #### cheching when the orbits start or stop ####
+  max_silence_time=120 ##maximum silence time of the updating of the orbits
+  t=0
+  i=0
+  j=0
+  Alice_silence_time=0
+  Bob_silence_time=0
+  on_off_flag=True ##flag which tells us whether the source should emit or not
+  while t<sim_time:
+
+    if on_off_flag==True:
+      if t>=Alice_orb_dict["SecondsFromStart"][i]:
+        Alice_silence_time=0
+        i=i+1
+      else:
+        Alice_silence_time=Alice_silence_time+1
+
+
+      if t>=Bob_orb_dict["SecondsFromStart"][j]:
+        Bob_silence_time=0
+        j=j+1
+      else:
+        Bob_silence_time=Bob_silence_time+1
+
+      if Bob_silence_time>max_silence_time :
+        stop.append(Bob_orb_dict["SecondsFromStart"][j-1])
+        on_off_flag=False
+
+      if Alice_silence_time>max_silence_time :
+        stop.append(Alice_orb_dict["SecondsFromStart"][i-1])
+        on_off_flag=False
+
+
+
+    else:
+      if t>=Alice_orb_dict["SecondsFromStart"][i] and t>=Bob_orb_dict["SecondsFromStart"][j]:
+        start.append(max(Alice_orb_dict["SecondsFromStart"][0], Alice_orb_dict["SecondsFromStart"][0]))
+        on_off_flag=True
+      if t>=Alice_orb_dict["SecondsFromStart"][i]:
+        i=i+1
+      if t>=Bob_orb_dict["SecondsFromStart"][j]:
+        j=j+1
+      
+        
+    t=t+1
+  
+  if len(start)==len(stop)+1:
+    stop.append(sim_time)
+
+  #### obtaining coincident windows #######
+  print("The windows in which the distribution is possible are: ")
+  emission_windows=[]
+
+  if len(start)==len(stop):
+    for i in range(len(start)):
+      emission_windows.append(stop[i]-start[i])
+      print ("Window ", i+1, " from ", start[i], " to ", stop[i], " of duration ",emission_windows[i] ,"\n")
+  else:
+    print("Error in window estimation ")
+
+
 
 #### Setting Bob and Alice as the receivers
 
@@ -617,19 +684,39 @@ def main():
 
 
   for i in range(len(Alice_orb_dict["SecondsFromStart"])):
-    CA_channel_update_process= Process(qc0, "update_channel", [Alice_orb_dict["Range"][i]*10**(3) ,Alice_orb_dict["AtmosphericLoss_dB"][i]])
-    CA_channel_update_event = Event(Alice_orb_dict["SecondsFromStart"][i], CA_channel_update_process)
+    CA_channel_update_process= Process(qc0, "update_channel", [Alice_orb_dict["Range"][i] ,Alice_orb_dict["AtmosphericLoss_dB"][i]])
+    CA_channel_update_event = Event(Alice_orb_dict["SecondsFromStart"][i]*10**(12), CA_channel_update_process) ## NB seconds are being converted in ps 
     tl.schedule(CA_channel_update_event)
 
 
   for i in range(len(Bob_orb_dict["SecondsFromStart"])):
-    CB_channel_update_process= Process(qc1, "update_channel", [Bob_orb_dict["Range"][i]*10**(3) ,Bob_orb_dict["AtmosphericLoss_dB"][i]])
-    CB_channel_update_event = Event(Bob_orb_dict["SecondsFromStart"][i], CB_channel_update_process)
+    CB_channel_update_process= Process(qc1, "update_channel", [Bob_orb_dict["Range"][i] ,Bob_orb_dict["AtmosphericLoss_dB"][i]])
+    CB_channel_update_event = Event(Bob_orb_dict["SecondsFromStart"][i]*10**(12), CB_channel_update_process) ## NB seconds are being converted in ps 
     tl.schedule(CB_channel_update_event)
 
 
-  for t in range(number_of_emissions):
-    emission_event.append(Event(emission_period*t, emission_process))
+  #### redefining start and stop in picoseconds  ##########
+  for i in range(len(start)):
+    start[i]=start[i]*10**(12)
+  for j in range(len(stop)):
+    stop[j]=stop[j]*10**(12)
+
+
+  i=0
+  j=0
+  print(int((start[0]/emission_period)))
+  for t in range(int((start[0]/emission_period) +1),number_of_emissions,1):
+    if  emission_period*t>=start[i] and emission_period*t<=stop[j]:
+      emission_event.append(Event(emission_period*t, emission_process))
+    elif i+1<len(start) and j+1<len(stop):
+      print("emission window", i, "has been implemented")
+      i=i+1
+      j=j+1
+    else:
+      print("emission window", i+1, "has been implemented")
+      break
+
+
 
   for h in range (len(emission_event)):
     tl.schedule(emission_event[h])
@@ -660,30 +747,27 @@ def main():
   b=0
   while time_for_off<=sim_time and a<len(Alice_orb_dict["SecondsFromStart"]) and b<len(Bob_orb_dict["SecondsFromStart"]):
     if Alice_orb_dict["SecondsFromStart"][a]>=time_for_off:
-      offsets["Distance"]=offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/(LS*10**(9)))
-      offsets["Update_time"]=offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a])
+      offsets["Distance"].append(np.abs((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b]))/LS)
+      offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)) ###converting only the offsets in picoseconds
       a=a+1
     elif Bob_orb_dict["SecondsFromStart"][b]>=time_for_off:
-      offsets["Distance"]=offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/(LS*10**(9)))
-      offsets["Update_time"]=offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a])
+      offsets["Distance"].append(np.abs((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b]))/LS)
+      offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)) ###converting only the offsets in picoseconds
       b=b+1
     time_for_off=time_for_off+0.5
 
 
 
 
-  print(offsets)
-
-
  
   start=0
   k=0
-  for i in range (n_Alice_measurements): 
-    if offsets["Update_time"][k]>results_Alice["Time"][i]: 
+  offset=offsets["Distance"][0]
+  for i in range (n_Alice_measurements):
+    if offsets["Update_time"][k]<=results_Alice["Time"][i]: 
       offset=offsets["Distance"][k]
-    else:
       k=k+1
-      offset=offsets["Distance"][k]
+
 
 
 
