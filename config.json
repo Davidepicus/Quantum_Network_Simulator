@@ -2,7 +2,7 @@
   "Detector_parameters": {
 
     "Parametro_1": "efficienza del detector, numero compreso tra 0 ed 1",
-    "det_eff" :0.35,
+    "det_eff" :0.95,
 
     "Parametro_2": "Conteggi oscuri al secondo",
     "dark_counts": 5000,
@@ -24,10 +24,10 @@
 
   "emitter_parameters": {
     "Parametro_1": "Frequenza di stimolazione del  in Hz",
-    "emitter_frequency": 60e2,
+    "emitter_frequency": 60e1,
 
     "Parametro_2": "Numero medio di coppie di fotoni emesse per ogni stimolazione1",
-    "av_ph_emitted": 0.3
+    "av_ph_emitted": 1
 
 
   },

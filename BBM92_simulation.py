@@ -704,7 +704,6 @@ def main():
 
   i=0
   j=0
-  print(int((start[0]/emission_period)))
   for t in range(int((start[0]/emission_period) +1),number_of_emissions,1):
     if  emission_period*t>=start[i] and emission_period*t<=stop[j]:
       emission_event.append(Event(emission_period*t, emission_process))
@@ -713,7 +712,6 @@ def main():
       i=i+1
       j=j+1
     else:
-      print("emission window", i+1, "has been implemented")
       break
 
 
@@ -747,11 +745,11 @@ def main():
   b=0
   while time_for_off<=sim_time and a<len(Alice_orb_dict["SecondsFromStart"]) and b<len(Bob_orb_dict["SecondsFromStart"]):
     if Alice_orb_dict["SecondsFromStart"][a]>=time_for_off:
-      offsets["Distance"].append(np.abs((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b]))/LS)
+      offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
       offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)) ###converting only the offsets in picoseconds
       a=a+1
     elif Bob_orb_dict["SecondsFromStart"][b]>=time_for_off:
-      offsets["Distance"].append(np.abs((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b]))/LS)
+      offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
       offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)) ###converting only the offsets in picoseconds
       b=b+1
     time_for_off=time_for_off+0.5
