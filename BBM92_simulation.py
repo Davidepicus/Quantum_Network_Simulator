@@ -23,132 +23,6 @@ from datetime import datetime
 
 
 
-#################### redefining SPDC_source #####################
-
-"""
-class SPDC_Crystal(ls.SPDCSource):
-  def __init__(self, name, timeline, frequency, wavelengths, mean_photon_num,encoding_type, phase_error=0):
-    super().__init__(name=name, timeline=timeline, frequency=frequency, wavelengths=wavelengths, mean_photon_num=mean_photon_num,encoding_type=encoding_type, phase_error=phase_error)
-
-
-
-  def emit(self, state_list):
-
-        """"""Method to emit photons.
-
-        Will emit photons for a length of time determined by the `state_list` parameter.
-        The number of photons emitted per period is calculated as a poisson random variable.
-
-        Arguments:
-            state_list (list[list[complex]]): list of complex coefficient arrays to send as photon-encoded qubits.
-                This is ignored for absorptive and Fock encoding types.
-                For these encoding types only the length of list matters and elements can be arbitrary.
-        """"""
-
-        log.logger.info(f"SPDC sourcee {self.name} emitting {len(state_list)} photons")
-
-        time = self.timeline.now()
-
-        if self.encoding_type["name"] == "fock":
-            # Use Fock encoding.
-            # The two generated photons should be entangled and should have keys pointing to same Fock state.
-            for _ in state_list:
-                # generate two new photons
-                new_photon0 = Photon("", self.timeline,
-                                     wavelength=self.wavelengths[0],
-                                     location=self,
-                                     encoding_type=self.encoding_type,
-                                     use_qm=True)
-                new_photon1 = Photon("", self.timeline,
-                                     wavelength=self.wavelengths[1],
-                                     location=self,
-                                     encoding_type=self.encoding_type,
-                                     use_qm=True)
-
-                # set shared state to squeezed state
-                state = self._generate_tmsv_state()
-                keys = [new_photon0.quantum_state, new_photon1.quantum_state]
-                self.timeline.quantum_manager.set(keys, state)
-
-                self.send_photons(time, [new_photon0, new_photon1])
-                self.photon_counter += 1
-                time += 1e12 / self.frequency
-
-        elif self.encoding_type["name"] == "absorptive":
-            for _ in state_list:
-                num_photon_pairs = self.get_generator().poisson(self.mean_photon_num)
-
-                for _ in range(num_photon_pairs):
-                    new_photon0 = Photon("", self.timeline,
-                                         wavelength=self.wavelengths[0],
-                                         location=self,
-                                         encoding_type=self.encoding_type,
-                                         use_qm=True)
-                    new_photon1 = Photon("", self.timeline,
-                                         wavelength=self.wavelengths[1],
-                                         location=self,
-                                         encoding_type=self.encoding_type,
-                                         use_qm=True)
-
-                    new_photon0.combine_state(new_photon1)
-                    new_photon0.set_state((complex(0), complex(0), complex(0), complex(1)))
-                    self.send_photons(time, [new_photon0, new_photon1])
-                    self.photon_counter += 1
-
-                if num_photon_pairs == 0:
-                    # send two null photons for purposes of entanglement
-                    new_photon0 = Photon("", self.timeline,
-                                         wavelength=self.wavelengths[0],
-                                         location=self,
-                                         encoding_type=self.encoding_type,
-                                         use_qm=True)
-                    new_photon1 = Photon("", self.timeline,
-                                         wavelength=self.wavelengths[1],
-                                         location=self,
-                                         encoding_type=self.encoding_type,
-                                         use_qm=True)
-
-                    new_photon0.is_null = True
-                    new_photon1.is_null = True
-                    new_photon0.combine_state(new_photon1)
-                    new_photon0.set_state((complex(1), complex(0), complex(0), complex(0)))
-                    self.send_photons(time, [new_photon0, new_photon1])
-
-                time += 1e12 / self.frequency
-
-        else:
-            for state in state_list:
-                num_photon_pairs = self.get_generator().poisson(
-                self.mean_photon_num)
-
-                if self.get_generator().random() < self.phase_error:
-                    state = multiply([1, -1], state)
-
-                for _ in range(num_photon_pairs):
-                    new_photon0 = Photon("", self.timeline,
-                                         wavelength=self.wavelengths[0],
-                                         location=self,
-                                         encoding_type=self.encoding_type)
-                    new_photon1 = Photon("", self.timeline,
-                                         wavelength=self.wavelengths[1],
-                                         location=self,
-                                         encoding_type=self.encoding_type)
-
-
-#                    new_photon0.state_index = 0
-#                    new_photon1.state_index = 1
-                    new_photon0.combine_state(new_photon1)
-                    new_photon0.set_state((state[0], complex(0), complex(0), state[1]))
-                    self.send_photons(time, [new_photon0, new_photon1])
-                    self.photon_counter += 1
-
-                time += 1e12 / self.frequency
-
-
-
-"""
-
-
 
 ################ Redefining quantum channel ################################
 
@@ -236,7 +110,10 @@ class Qchannel(optch.QuantumChannel):
       print("Error, either distance value or absorption are invalid, parameters have not been changed")
     else:
       self.distance=dist
-      self.attenuation=absor/dist
+      self.attenuation=absor
+      self.delay = round(self.distance / self.light_speed)
+      self.loss = 1 - 10 ** (self.distance * self.attenuation / -10)
+#      print("attenuation has been set to ", self.attenuation)
 
 
 
@@ -266,7 +143,7 @@ class BeamSplitter(BS.FockBeamSplitter2):
      ######## get funcion of the beam splitter which overrides the one present in the Sequence files ##########
    def get(self, photon):
         """Receive photon from one end nodes"""
-
+#        print("photon in the Beam splitter", self.name)
         self.photon_counter += 1
             
         #print(f"Photon counter BEAM SPLITTER: {self.photon_counter} at time {self.timeline.now()}")
@@ -311,6 +188,7 @@ class PBeamSplitter(BS.BeamSplitter):
 
   ######## get funcion of the  polarizing beam splitter which overrides the one present in the Sequence files ##########
   def get(self, photon):
+#    print("photon in the  Polarizing Beam splitter", self.name)
     """Method to receive a photon for measurement.
 
         Args:
@@ -566,6 +444,14 @@ def main():
   Alice_orb_dict["Range"]=Alice_orb_dict["Range"]*10**(3)
   Alice_orb_dict["Range"]=Alice_orb_dict["Range"]*10**(3)
 
+
+  ###rewriting atmospheric loss in db per meter ####
+  for k in range(len(Bob_orb_dict["AtmosphericLoss_dB"])):
+    Bob_orb_dict["AtmosphericLoss_dB"][k]=0 #Bob_orb_dict["AtmosphericLoss_dB"][k]/Bob_orb_dict["Range"][k]
+  for k in range(len(Alice_orb_dict["AtmosphericLoss_dB"])):
+    Alice_orb_dict["AtmosphericLoss_dB"][k]=0 #Alice_orb_dict["AtmosphericLoss_dB"][k]/Alice_orb_dict["Range"][k]
+
+
   ############# getting parameters from the json file ######################
   runtime =parameters["general_parameters"]["runtime"]*(10)**(12)
   emission_frequency=parameters["emitter_parameters"]["emitter_frequency"]*10**(-12) ###in numbers of emission per picoseconds
@@ -576,10 +462,10 @@ def main():
   time_resolution=parameters["Detector_parameters"]["time_resolution"]
   PBS_eff=parameters["Detector_parameters"]["PBS_efficiency"]
   BS_eff=parameters["Detector_parameters"]["Beam_splitter_efficiency"]
-  distance_CA = 1
-  distance_CB = 1
-  ch_attenuationCA= 100000
-  ch_attenuationCB= 100000
+  distance_CA = 10000
+  distance_CB = 10000
+  ch_attenuationCA= 0
+  ch_attenuationCB= 0
   LS=constants.speed_of_light*parameters["channel_parameters"]["light_speed"]*10**(-12) ##light speed expresses in meters per picosecond
   ########### setting up the parameters #################
   number_of_emissions=int(emission_frequency*runtime)-1
@@ -682,18 +568,19 @@ def main():
   emission_event=[]
 
 
-
+  ### scheduling the events where the satellite moves, so when the distance changes for Satellite-Alice channel ####
   for i in range(len(Alice_orb_dict["SecondsFromStart"])):
     CA_channel_update_process= Process(qc0, "update_channel", [Alice_orb_dict["Range"][i] ,Alice_orb_dict["AtmosphericLoss_dB"][i]])
     CA_channel_update_event = Event(Alice_orb_dict["SecondsFromStart"][i]*10**(12), CA_channel_update_process) ## NB seconds are being converted in ps 
     tl.schedule(CA_channel_update_event)
 
-
+  ### scheduling the events where the satellite moves, so when the distance changes for Satellite-Bob channel ####
   for i in range(len(Bob_orb_dict["SecondsFromStart"])):
     CB_channel_update_process= Process(qc1, "update_channel", [Bob_orb_dict["Range"][i] ,Bob_orb_dict["AtmosphericLoss_dB"][i]])
     CB_channel_update_event = Event(Bob_orb_dict["SecondsFromStart"][i]*10**(12), CB_channel_update_process) ## NB seconds are being converted in ps 
     tl.schedule(CB_channel_update_event)
 
+  
 
   #### redefining start and stop in picoseconds  ##########
   for i in range(len(start)):
@@ -738,6 +625,9 @@ def main():
   Alice_raw_key=[]
   Bob_raw_key=[]
 
+  print("The number of measurement performed by alice is: ", n_Alice_measurements)
+  print("The number of measurement performed by bob is: ", n_Bob_measurements)
+
   ##### Finding all the time offsets ####
 
   time_for_off=0
@@ -754,8 +644,8 @@ def main():
       b=b+1
     time_for_off=time_for_off+0.5
 
-
-
+  for k in range(20):
+    print(results_Alice["Time"][k]-results_Bob["Time"][k], "   ",offsets["Distance"][k])
 
  
   start=0
@@ -767,8 +657,8 @@ def main():
       k=k+1
 
 
-
-
+    
+  
     for j in range(start,n_Bob_measurements,1):
       if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
         coincident_counts=coincident_counts+1
