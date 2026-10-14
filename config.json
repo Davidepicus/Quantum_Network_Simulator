@@ -11,7 +11,7 @@
     "count_rate_max":3e18,
 
     "Parametro_4": "risoluzione temporale dei detector in picosecondi",
-    "time_resolution": 5000,
+    "time_resolution": 1,
 
     "Parametro_5": "Efficienza dei polarizing beam splitter, numero compreso tra zero ed 1",
     "PBS_efficiency": 1,
@@ -27,7 +27,7 @@
     "emitter_frequency": 60e1,
 
     "Parametro_2": "Numero medio di coppie di fotoni emesse per ogni stimolazione1",
-    "av_ph_emitted": 0.3
+    "av_ph_emitted": 0.1
 
 
   },

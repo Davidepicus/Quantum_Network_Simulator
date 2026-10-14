@@ -462,19 +462,17 @@ def main():
   time_resolution=parameters["Detector_parameters"]["time_resolution"]
   PBS_eff=parameters["Detector_parameters"]["PBS_efficiency"]
   BS_eff=parameters["Detector_parameters"]["Beam_splitter_efficiency"]
-  distance_CA = 10000
-  distance_CB = 10000
+  distance_CA = 100
+  distance_CB = 100
   ch_attenuationCA= 0
   ch_attenuationCB= 0
   LS=constants.speed_of_light*parameters["channel_parameters"]["light_speed"]*10**(-12) ##light speed expresses in meters per picosecond
   ########### setting up the parameters #################
-  number_of_emissions=int(emission_frequency*runtime)-1
-  emission_period=(int(1/emission_frequency))
+  emission_period=(int(1/emission_frequency)) #period between two emissions
   sim_time=runtime*10**(-12)
   print("The script will simulate events up to : ", sim_time, " Seconds")
   tl = Timeline(runtime)
   tl.show_progress = True
-
 #### Defining nodes, Alice and Bob (the receivers) and Charlie (the sender), and quantum channels ################
   Alice = BBM92_receiver(name="Alice", tl=tl,det_eff=detector_efficiency, dark_counts=dark_counts, count_rate_max=count_rate_max, time_resolution=time_resolution, reg=Reg_Alice, PBS_efficiency=PBS_eff, BS_efficiency=BS_eff)
   
@@ -564,9 +562,6 @@ def main():
 
 
   ############## Defining the processes and events #############
-  emission_process = Process(Charlie, "emit_photons", [])
-  emission_event=[]
-
 
   ### scheduling the events where the satellite moves, so when the distance changes for Satellite-Alice channel ####
   for i in range(len(Alice_orb_dict["SecondsFromStart"])):
@@ -588,23 +583,32 @@ def main():
   for j in range(len(stop)):
     stop[j]=stop[j]*10**(12)
 
+  ### turning on the emission only within the windows #####
+  emission_process = Process(Charlie, "emit_photons", [])
 
-  i=0
-  j=0
-  for t in range(int((start[0]/emission_period) +1),number_of_emissions,1):
-    if  emission_period*t>=start[i] and emission_period*t<=stop[j]:
-      emission_event.append(Event(emission_period*t, emission_process))
-    elif i+1<len(start) and j+1<len(stop):
-      print("emission window", i, "has been implemented")
-      i=i+1
-      j=j+1
-    else:
-      break
+  for i in range(len(start)):
+    t=start[i] 
+    while  t>=start[i] and t<=stop[i]:
+      emission_event= Event(t, emission_process)
+      tl.schedule(emission_event)
+      t=t+emission_period
+
+#  i=0
+#  j=0
+#  for t in range(int((start[0]/emission_period) +1),number_of_emissions,1):
+#    if  emission_period*t>=start[i] and emission_period*t<=stop[j]:
+#      emission_event.append(Event(emission_period*t, emission_process))
+#    elif i+1<len(start) and j+1<len(stop):
+#      print("emission window", i, "has been implemented")
+#      i=i+1
+#      j=j+1
+#    else:
+#      break
 
 
 
-  for h in range (len(emission_event)):
-    tl.schedule(emission_event[h])
+#  for h in range (len(emission_event)):
+#    tl.schedule(emission_event[h])
 
 
 
@@ -625,7 +629,7 @@ def main():
   Alice_raw_key=[]
   Bob_raw_key=[]
 
-  print("The number of measurement performed by alice is: ", n_Alice_measurements)
+  print(" \nThe number of measurement performed by alice is: ", n_Alice_measurements)
   print("The number of measurement performed by bob is: ", n_Bob_measurements)
 
   ##### Finding all the time offsets ####
@@ -634,39 +638,43 @@ def main():
   a=0
   b=0
   while time_for_off<=sim_time and a<len(Alice_orb_dict["SecondsFromStart"]) and b<len(Bob_orb_dict["SecondsFromStart"]):
-    if Alice_orb_dict["SecondsFromStart"][a]>=time_for_off:
+    if Alice_orb_dict["SecondsFromStart"][a]<=time_for_off:
       offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
       offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)) ###converting only the offsets in picoseconds
       a=a+1
-    elif Bob_orb_dict["SecondsFromStart"][b]>=time_for_off:
+    elif Bob_orb_dict["SecondsFromStart"][b]<=time_for_off:
       offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
-      offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)) ###converting only the offsets in picoseconds
+      offsets["Update_time"].append(Bob_orb_dict["SecondsFromStart"][b]*10**(12)) ###converting only the offsets in picoseconds
       b=b+1
     time_for_off=time_for_off+0.5
 
-  for k in range(20):
-    print(results_Alice["Time"][k]-results_Bob["Time"][k], "   ",offsets["Distance"][k])
 
- 
+#  diff=results_Alice["Time"][0]- results_Bob["Time"][0]
+#  for k in range(0,400,1):
+#    if diff!=results_Alice["Time"][k]- results_Bob["Time"][k]:
+#      print(k,"change   ",results_Alice["Time"][k]*10**(-12), "   ",results_Alice["Time"][k]*10**(-12) - results_Bob["Time"][k]*10**(-12) ) #, "   ",offsets["Distance"][k])
+#      diff=results_Alice["Time"][k]- results_Bob["Time"][k]
+
+#  print("     ",offsets)
+
+
+
   start=0
   k=0
   offset=offsets["Distance"][0]
   for i in range (n_Alice_measurements):
-    if offsets["Update_time"][k]<=results_Alice["Time"][i]: 
+    if offsets["Update_time"][k]<=results_Alice["Time"][i] and k<len(offsets["Update_time"])-1: 
       offset=offsets["Distance"][k]
       k=k+1
-
-
-    
-  
     for j in range(start,n_Bob_measurements,1):
-      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
+      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=100000000*time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
+        print(results_Alice["Time"][i]-results_Bob["Time"][j], "   ",offset)
         coincident_counts=coincident_counts+1
         Alice_raw_key.append(results_Alice["Det_result"][i])
         Bob_raw_key.append(results_Bob["Det_result"][j])
         start=j
         break
-      elif np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)> 100000*time_resolution:
+      elif np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)> 1000000000000000000*time_resolution:
         break
       
     
