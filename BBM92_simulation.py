@@ -620,23 +620,6 @@ def main():
       tl.schedule(emission_event)
       t=t+emission_period
 
-#  i=0
-#  j=0
-#  for t in range(int((start[0]/emission_period) +1),number_of_emissions,1):
-#    if  emission_period*t>=start[i] and emission_period*t<=stop[j]:
-#      emission_event.append(Event(emission_period*t, emission_process))
-#    elif i+1<len(start) and j+1<len(stop):
-#      print("emission window", i, "has been implemented")
-#      i=i+1
-#      j=j+1
-#    else:
-#      break
-
-
-
-#  for h in range (len(emission_event)):
-#    tl.schedule(emission_event[h])
-
 
 
   ###### Running the simulation ###############
@@ -652,7 +635,7 @@ def main():
   n_Alice_measurements=len(results_Alice["Time"])
   n_Bob_measurements=len(results_Bob["Time"])
   offsets={"Update_time":[], "Distance":[]}
-  coincident_counts=0 
+  coincident_counts=0
   Alice_raw_key=[]
   Bob_raw_key=[]
 
@@ -676,90 +659,110 @@ def main():
     time_for_off=time_for_off+0.5
 
 
-#  diff=results_Alice["Time"][0]- results_Bob["Time"][0]
-#  for k in range(0,400,1):
-#    if diff!=results_Alice["Time"][k]- results_Bob["Time"][k]:
-#      print(k,"change   ",results_Alice["Time"][k]*10**(-12), "   ",results_Alice["Time"][k]*10**(-12) - results_Bob["Time"][k]*10**(-12) ) #, "   ",offsets["Distance"][k])
-#      diff=results_Alice["Time"][k]- results_Bob["Time"][k]
-
-#  print("     ",offsets)
+  average_QBERS=np.zeros(int(len(start)))
+  average_KTR=np.zeros(int(len(start)))
 
 
-
-#  for w in len(start)
-  start_Alice_pp=0
-  start_Bob_pp=0
-  k=0
-  offset=0
-  research_window=100*10**(12)
-  
-  ### finding the first measurement of alice which is inside the window ## 
-  for a in range(len(results_Alice["Time"])):
-    if results_Alice["Time"][a]>=start[0]:
-      start_Alice_pp=a
-      break
-
-  ### finding the first measurement of bob which is inside the window ## 
-  for b in range(len(results_Bob["Time"])):
-    if results_Bob["Time"][b]>=start[0]:
-      start_Bob_pp=b
-      break
-
-
-
-  #### finding the offset at start time ###
-  for h in range(len(offsets["Distance"])-1):
-    if offsets["Update_time"][h]<=start[0] and  offsets["Update_time"][h+1]>=start[0] :
-      offset=offsets["Distance"][h]
-      k=h+1
-#      print("uelaaaa", h, "   ", offsets["Update_time"][h])
-      break
-  if offset==0:
-    print("Problem with individuation of the offset")
-
-  #### recovering the coincident measurements #####
-  for i in range (start_Alice_pp, n_Alice_measurements, 1):
-    if k<len(offsets["Update_time"]):
-      if offsets["Update_time"][k]<=results_Alice["Time"][i]:
-  #      k=k+1
-#        print("Update_time is ",offsets["Update_time"][k],"h is ", k," at alice time index of ", i )
-        offset=offsets["Distance"][k-1]
-        k=k+1
-
-
-    for j in range(start_Bob_pp,n_Bob_measurements,1):
-      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=2*time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
-#        print(results_Alice["Time"][i]-results_Bob["Time"][j], "   ",offset)
-        coincident_counts=coincident_counts+1
-        Alice_raw_key.append(results_Alice["Det_result"][i])
-        Bob_raw_key.append(results_Bob["Det_result"][j])
-        start_Bob_pp=j
-        break
-      elif  np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)> research_window:
-        break
-      
+  for w in range(len(start)):
+    print("\n Post processing orbit ", w+1)
+    coincident_counts=0
+    Alice_raw_key=[]
+    Bob_raw_key=[]
+    start_Alice_pp=0
+    start_Bob_pp=0
+    stop_Alice_pp=0
+    stop_Bob_pp=0
+    k=0
+    offset=0
+    research_window=100*10**(12)
     
-  print(offsets)
-  print("Total length of the raw key is: ",coincident_counts )
-  key_rate=int(coincident_counts/(runtime*10**(-12)))
-  print("Key transmission rate is: " ,key_rate, " Qubit/sec")
+    ### finding the first measurement of alice which is inside the window ## 
+    for a in range(len(results_Alice["Time"])):
+      if results_Alice["Time"][a]>=start[w]:
+        start_Alice_pp=a
+        break
 
-  correct_counts=0
-  different_counts=0
-  for k in range(coincident_counts)  :
-    if Bob_raw_key[k]==Alice_raw_key[k]:
-      correct_counts=correct_counts+1
+    ### finding the last measurement of alice which is inside the window ## 
+    for a in range(len(results_Alice["Time"])):
+      if results_Alice["Time"][a]>=stop[w]:
+        stop_Alice_pp=a
+        break
+      else:
+        stop_Alice_pp=len(results_Alice["Time"])
+
+
+    ### finding the first measurement of bob which is inside the window ## 
+    for b in range(len(results_Bob["Time"])):
+      if results_Bob["Time"][b]>=start[w]:
+        start_Bob_pp=b
+        break
+
+
+    ### finding the last measurement of Bob which is inside the window ## 
+    for b in range(len(results_Bob["Time"])):
+      if results_Bob["Time"][b]>=stop[w]:
+        stop_Bob_pp=b
+        break
+      else:
+        stop_Bob_pp=len(results_Bob["Time"])
+
+
+    #### finding the offset at start time ###
+    for h in range(len(offsets["Distance"])-1):
+      if offsets["Update_time"][h]<=start[w] and  offsets["Update_time"][h+1]>=start[w] :
+        offset=offsets["Distance"][h]
+        k=h+1
+        break
+    if offset==0:
+      print("Problem with individuation of the offset")
+
+    #### recovering the coincident measurements #####
+    for i in range (start_Alice_pp, stop_Alice_pp, 1):
+      if k<len(offsets["Update_time"]):
+        if offsets["Update_time"][k]<=results_Alice["Time"][i]:
+          offset=offsets["Distance"][k-1]
+          k=k+1
+
+
+      for j in range(start_Bob_pp,stop_Bob_pp,1):
+        if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=2*time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
+  #        print(results_Alice["Time"][i]-results_Bob["Time"][j], "   ",offset)
+          coincident_counts=coincident_counts+1
+          Alice_raw_key.append(results_Alice["Det_result"][i])
+          Bob_raw_key.append(results_Bob["Det_result"][j])
+          start_Bob_pp=j
+          break
+        elif  np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)> research_window:
+          break
+        
+      
+
+    print("Total length of the raw key for the orbit", w+1, " is: ",coincident_counts )
+    key_rate=int(coincident_counts/((stop[w]-start[w])*10**(-12)))
+    average_KTR[w]=int(coincident_counts/((stop[w]-start[w])*10**(-12)))
+    print("The average key transmission rate throughout the orbit is: " ,key_rate, " Qubit/sec")
+
+    correct_counts=0
+    different_counts=0
+    for k in range(coincident_counts)  :
+      if Bob_raw_key[k]==Alice_raw_key[k]:
+        correct_counts=correct_counts+1
+      else:
+        different_counts=different_counts+1
+
+    if coincident_counts==0:
+      QBER="None"
+      average_QBERS[w]=QBER
+      print("No coincident counts have been detected for the orbit ",w+1, ", therefore QBER cannot be estimated")
     else:
-      different_counts=different_counts+1
-
-  if coincident_counts==0:
-    print("No coincident counts have been detected, therefore QBER cannot be estimated")
-  else:
-    QBER=(different_counts/coincident_counts)
-    print(f"The QBER is: {QBER:.3f}")
-  
+      QBER=(different_counts/coincident_counts)
+      average_QBERS[w]=QBER
+      print(f"The QBER is: {QBER:.3f}")
+    
 
 
+
+    
 
 if __name__ == "__main__":
   main()
