@@ -8,8 +8,9 @@ Il link alla documentazione del pacchetto SeQUeNCe è: https://sequence-rtd-tuto
 
 
 
-Per ora ci sono tre  files nella repository.
-"BB84_test.py" è il test di una simulazione di un protocollo BB84. Questo file è una copia esatta del codice che si trova nella repository di Sequence. 
+Per ora ci sono tre  files  importanti nella repository.
+"BB84_simulation.py" è il test di una simulazione di un protocollo BB84. Devo ancora iniziare a lavorare a questa simulazione.
+Data_organyzer.py è un codice che serve per aprire i dati delle orbite e salvarli nel formato csv per una gestione più facile 
 
 # BBM92 protocol simulation
 
@@ -25,7 +26,7 @@ Vi è inoltre una classe chiamata "det_counter" che serve per registrare gli arr
 
 # Stato della Simulazione
 
-Alice, Charlie e Bob sono connessi. La simulazione funziona ma va ancora otimizzata. 
+Alice, Charlie e Bob sono connessi. La simulazione funziona ma va ancora otimizzata, in particolare il post processing. 
 I parametri che possono essere modificati sono:
 
 I conteggi oscuri, il dead time ed il time jitter dei detector.
@@ -34,13 +35,15 @@ L'efficienza dei beam splitter 50/50 1X2, e l'efficienza dei polarizing beam spl
 
 La frequenza di stimolazione del cristallo SPDC e il valore medio di coppie di fotoni emesse per stimolazione.
 
-L'attenuazione dei canali quantistici, e la velocità della luce in essi
+L'attenuazione dei canali quantistici, e la velocità della luce in essi.
 
-Il tempo di simulazione e la distanza tra i vari nodi
+Il tempo di simulazione. 
 
-Tutti questi parametri possono essere modificati dal file di configurazione "config.json". Questo prototipo è funzionante. Un tempo di simulazione consigliato per ottenere risultati plausibili senza aspettare troppo, è di 0.005-0.01 secondi. 
+Tutti questi parametri possono essere modificati dal file di configurazione "config.json". Questo prototipo è funzionante, anche se i paramteri vanno introdotti con cura per evitare un tempo di simulazione e post processing troppo lungo. 
 
-Manca l'inserimento degli effetti dovuti alla depolarizzazione dei fotoni all'interno dei canali quantistici. La risoluzione di questo problema tuttavia dovrebbe essere complicata. Potrebbe essere inoltre necessario migliorare il criterio di post processing delle chiavi grezze.
+Manca l'inserimento degli effetti dovuti alla depolarizzazione dei fotoni all'interno dei canali quantistici, anche se per considerare questi effetti si potrebbe cambiare la fedeltà dei beam splitter. Per ora l'attenuazione dei canali è nulla in quanto il tempo di simulazione necessario sarebbe troppo lungo. 
+
+Il satellite si muove, e i fotoni vengono emessi e ricevuti correttamente
 
 
 
