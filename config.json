@@ -2,16 +2,16 @@
   "Detector_parameters": {
 
     "Parametro_1": "efficienza del detector, numero compreso tra 0 ed 1",
-    "det_eff" :1,
+    "det_eff" :0.35,
 
     "Parametro_2": "Conteggi oscuri al secondo",
-    "dark_counts": 0,
+    "dark_counts": 5,
 
     "Parametro_3": "Conteggi massimi al picosecondo (l'inverso del dead time del detector)",
     "count_rate_max":3e18,
 
     "Parametro_4": "risoluzione temporale dei detector in picosecondi",
-    "time_resolution": 1,
+    "time_resolution": 5000,
 
     "Parametro_5": "Efficienza dei polarizing beam splitter, numero compreso tra zero ed 1",
     "PBS_efficiency": 1,

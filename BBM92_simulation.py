@@ -462,15 +462,15 @@ def main():
   time_resolution=parameters["Detector_parameters"]["time_resolution"]
   PBS_eff=parameters["Detector_parameters"]["PBS_efficiency"]
   BS_eff=parameters["Detector_parameters"]["Beam_splitter_efficiency"]
-  distance_CA = 100
-  distance_CB = 100
-  ch_attenuationCA= 0
-  ch_attenuationCB= 0
+  distance_CA = 100 # dummy value
+  distance_CB = 100 # dummy value
+  ch_attenuationCA= 10000000 ## dummy value to impose that the attenuation is  high
+  ch_attenuationCB= 10000000 ## dummy value to impose that the attenuation is  high
   LS=constants.speed_of_light*parameters["channel_parameters"]["light_speed"]*10**(-12) ##light speed expresses in meters per picosecond
   ########### setting up the parameters #################
   emission_period=(int(1/emission_frequency)) #period between two emissions
   sim_time=runtime*10**(-12)
-  print("The script will simulate events up to : ", sim_time, " Seconds")
+#  print("The script will simulate events up to : ", sim_time, " Seconds")
   tl = Timeline(runtime)
   tl.show_progress = True
 #### Defining nodes, Alice and Bob (the receivers) and Charlie (the sender), and quantum channels ################
@@ -486,19 +486,35 @@ def main():
   Charlie.set_seed(2)
 
 
-  start=[] #times at which the emitter should start emitting as the satellite can se both of the receivers
-  stop=[] #times at which the emitter should stop emitting as the satellite cannot see at least one of the receivers
+  start=[] #times in seconds at which the emitter should start emitting as the satellite can see both of the receivers
+  stop=[] #times in seconds at which the emitter should stop emitting as the satellite cannot see at least one of the receivers
   start.append(max(Alice_orb_dict["SecondsFromStart"][0], Alice_orb_dict["SecondsFromStart"][0])) #instant of coincident visibility
+  start_date=[] #times in date format at which the emitter should start emitting as the satellite can see both of the receivers
+  stop_date=[] #times in date format at which the emitter should stop emitting as the satellite cannot see at least one of the receivers
+  start_date.append(max(Alice_orb_dict["Time"][0], Alice_orb_dict["Time"][0])) #instant of coincident visibility
 
 
   #### cheching when the orbits start or stop ####
-  max_silence_time=120 ##maximum silence time of the updating of the orbits
+  max_silence_time=1200 ##maximum silence time of the updating of the orbits in seconds, it needs to be bigger than the orbit time 
   t=0
   i=0
   j=0
+  limiter="None"
   Alice_silence_time=0
   Bob_silence_time=0
   on_off_flag=True ##flag which tells us whether the source should emit or not
+
+  if sim_time> max(Alice_orb_dict["SecondsFromStart"]):
+    print("Simulation time has been reset to: ", max(Alice_orb_dict["SecondsFromStart"]), " seconds, as it exceeds the simulation time of the orbits" )
+    sim_time=max(Alice_orb_dict["SecondsFromStart"])
+  elif sim_time> max(Bob_orb_dict["SecondsFromStart"]):
+    print("Simulation time has been reset to: ", max(Bob_orb_dict["SecondsFromStart"]), " seconds as it exceeds the simulation time of the orbits" )
+    sim_time=max(Bob_orb_dict["SecondsFromStart"])
+
+  print("The script will simulate events up to : ", sim_time, " Seconds")
+
+
+
   while t<sim_time:
 
     if on_off_flag==True:
@@ -517,37 +533,48 @@ def main():
 
       if Bob_silence_time>max_silence_time :
         stop.append(Bob_orb_dict["SecondsFromStart"][j-1])
+        stop_date.append(Bob_orb_dict["Time"][j-1])
         on_off_flag=False
+        limiter="Bob"
 
       if Alice_silence_time>max_silence_time :
         stop.append(Alice_orb_dict["SecondsFromStart"][i-1])
+        stop_date.append(Alice_orb_dict["Time"][i-1])
         on_off_flag=False
+        limiter="Alice"
 
 
 
-    else:
+    elif on_off_flag==False:
       if t>=Alice_orb_dict["SecondsFromStart"][i] and t>=Bob_orb_dict["SecondsFromStart"][j]:
-        start.append(max(Alice_orb_dict["SecondsFromStart"][0], Alice_orb_dict["SecondsFromStart"][0]))
+        start.append(max(Alice_orb_dict["SecondsFromStart"][i], Bob_orb_dict["SecondsFromStart"][j]))
+        start_date.append(max(Alice_orb_dict["Time"][i], Bob_orb_dict["Time"][j]))
         on_off_flag=True
-      if t>=Alice_orb_dict["SecondsFromStart"][i]:
-        i=i+1
-      if t>=Bob_orb_dict["SecondsFromStart"][j]:
-        j=j+1
+#      if t>=Alice_orb_dict["SecondsFromStart"][i]:
+#        i=i+1
+#      if t>=Bob_orb_dict["SecondsFromStart"][j]:
+#        j=j+1
       
-        
+    else:
+      print("Problem with window estimation")        
+
+
     t=t+1
   
   if len(start)==len(stop)+1:
     stop.append(sim_time)
+    stop_date.append(sim_time)
+
+
 
   #### obtaining coincident windows #######
-  print("The windows in which the distribution is possible are: ")
+  print("\n The windows in which the distribution is possible are: \n")
   emission_windows=[]
 
   if len(start)==len(stop):
     for i in range(len(start)):
       emission_windows.append(stop[i]-start[i])
-      print ("Window ", i+1, " from ", start[i], " to ", stop[i], " of duration ",emission_windows[i] ,"\n")
+      print ("Window ", i+1, " from ", start_date[i], " to ", stop_date[i], " of duration ",emission_windows[i], "seconds")
   else:
     print("Error in window estimation ")
 
@@ -659,26 +686,60 @@ def main():
 
 
 
-  start=0
+#  for w in len(start)
+  start_Alice_pp=0
+  start_Bob_pp=0
   k=0
-  offset=offsets["Distance"][0]
-  for i in range (n_Alice_measurements):
-    if offsets["Update_time"][k]<=results_Alice["Time"][i] and k<len(offsets["Update_time"])-1: 
-      offset=offsets["Distance"][k]
-      k=k+1
-    for j in range(start,n_Bob_measurements,1):
-      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=100000000*time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
-        print(results_Alice["Time"][i]-results_Bob["Time"][j], "   ",offset)
+  offset=0
+  research_window=100*10**(12)
+  
+  ### finding the first measurement of alice which is inside the window ## 
+  for a in range(len(results_Alice["Time"])):
+    if results_Alice["Time"][a]>=start[0]:
+      start_Alice_pp=a
+      break
+
+  ### finding the first measurement of bob which is inside the window ## 
+  for b in range(len(results_Bob["Time"])):
+    if results_Bob["Time"][b]>=start[0]:
+      start_Bob_pp=b
+      break
+
+
+
+  #### finding the offset at start time ###
+  for h in range(len(offsets["Distance"])-1):
+    if offsets["Update_time"][h]<=start[0] and  offsets["Update_time"][h+1]>=start[0] :
+      offset=offsets["Distance"][h]
+      k=h+1
+#      print("uelaaaa", h, "   ", offsets["Update_time"][h])
+      break
+  if offset==0:
+    print("Problem with individuation of the offset")
+
+  #### recovering the coincident measurements #####
+  for i in range (start_Alice_pp, n_Alice_measurements, 1):
+    if k<len(offsets["Update_time"]):
+      if offsets["Update_time"][k]<=results_Alice["Time"][i]:
+  #      k=k+1
+#        print("Update_time is ",offsets["Update_time"][k],"h is ", k," at alice time index of ", i )
+        offset=offsets["Distance"][k-1]
+        k=k+1
+
+
+    for j in range(start_Bob_pp,n_Bob_measurements,1):
+      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=2*time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
+#        print(results_Alice["Time"][i]-results_Bob["Time"][j], "   ",offset)
         coincident_counts=coincident_counts+1
         Alice_raw_key.append(results_Alice["Det_result"][i])
         Bob_raw_key.append(results_Bob["Det_result"][j])
-        start=j
+        start_Bob_pp=j
         break
-      elif np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)> 1000000000000000000*time_resolution:
+      elif  np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)> research_window:
         break
       
     
-
+  print(offsets)
   print("Total length of the raw key is: ",coincident_counts )
   key_rate=int(coincident_counts/(runtime*10**(-12)))
   print("Key transmission rate is: " ,key_rate, " Qubit/sec")
