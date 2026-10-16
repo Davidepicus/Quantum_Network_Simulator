@@ -2,10 +2,10 @@
   "Detector_parameters": {
 
     "Parametro_1": "efficienza del detector, numero compreso tra 0 ed 1",
-    "det_eff" :1,
+    "det_eff" :0.5,
 
     "Parametro_2": "Conteggi oscuri al secondo",
-    "dark_counts": 5,
+    "dark_counts": 10,
 
     "Parametro_3": "Conteggi massimi al picosecondo (l'inverso del dead time del detector)",
     "count_rate_max":3e18,

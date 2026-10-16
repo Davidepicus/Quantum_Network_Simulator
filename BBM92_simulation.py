@@ -550,11 +550,7 @@ def main():
         start.append(max(Alice_orb_dict["SecondsFromStart"][i], Bob_orb_dict["SecondsFromStart"][j]))
         start_date.append(max(Alice_orb_dict["Time"][i], Bob_orb_dict["Time"][j]))
         on_off_flag=True
-#      if t>=Alice_orb_dict["SecondsFromStart"][i]:
-#        i=i+1
-#      if t>=Bob_orb_dict["SecondsFromStart"][j]:
-#        j=j+1
-      
+     
     else:
       print("Problem with window estimation")        
 
@@ -574,7 +570,7 @@ def main():
   if len(start)==len(stop):
     for i in range(len(start)):
       emission_windows.append(stop[i]-start[i])
-      print ("Window ", i+1, " from ", start_date[i], " to ", stop_date[i], " of duration ",emission_windows[i], "seconds")
+      print ("Window ", i+1, " from ", start_date[i] , " to ", stop_date[i], " of duration ", f"{emission_windows[i]:.1f}", "seconds")
   else:
     print("Error in window estimation ")
 
@@ -648,17 +644,26 @@ def main():
   a=0
   b=0
   while time_for_off<=sim_time and a<len(Alice_orb_dict["SecondsFromStart"]) and b<len(Bob_orb_dict["SecondsFromStart"]):
-    if Alice_orb_dict["SecondsFromStart"][a]<=time_for_off:
+
+    if Alice_orb_dict["SecondsFromStart"][a]<=time_for_off and Bob_orb_dict["SecondsFromStart"][b]<=time_for_off:
+      offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
+      offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)) ###converting only the offsets in picosecond
+#      print(Bob_orb_dict["Time"][b])
+      a=a+1
+      b=b+1
+    elif Alice_orb_dict["SecondsFromStart"][a]<=time_for_off:
       offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
       offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)) ###converting only the offsets in picoseconds
+#      print(Alice_orb_dict["Time"][a])
       a=a+1
     elif Bob_orb_dict["SecondsFromStart"][b]<=time_for_off:
       offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
       offsets["Update_time"].append(Bob_orb_dict["SecondsFromStart"][b]*10**(12)) ###converting only the offsets in picoseconds
+#      print(Bob_orb_dict["Time"][b])
       b=b+1
-    time_for_off=time_for_off+0.5
+    time_for_off=time_for_off+0.1
 
-
+#  print(offsets["Update_time"])
   average_QBERS=np.zeros(int(len(start)))
   average_KTR=np.zeros(int(len(start)))
 
@@ -668,6 +673,10 @@ def main():
     coincident_counts=0
     Alice_raw_key=[]
     Bob_raw_key=[]
+    Alice_RK_var=[]
+    Bob_RK_var=[]
+    kr_array=[]
+    QBER_array=[]
     start_Alice_pp=0
     start_Bob_pp=0
     stop_Alice_pp=0
@@ -718,29 +727,54 @@ def main():
 
     #### recovering the coincident measurements #####
     for i in range (start_Alice_pp, stop_Alice_pp, 1):
-      if k<len(offsets["Update_time"]):
-        if offsets["Update_time"][k]<=results_Alice["Time"][i]:
-          offset=offsets["Distance"][k-1]
-          k=k+1
+#      if k<len(offsets["Update_time"]):
+      #### updating offset and calculating QBER and key rate for that offset###
+      if offsets["Update_time"][k]<=results_Alice["Time"][i] and k<len(offsets["Update_time"]):
+        offset=offsets["Distance"][k-1]
+        if (offsets["Update_time"][k]-offsets["Update_time"][k-1])==0:
+          print("Problem with kr at: ", offsets["Update_time"][k], "   " ,offsets["Update_time"][k-1])
+        else:
+          kr_array.append(len(Alice_RK_var)/((offsets["Update_time"][k]-offsets["Update_time"][k-1])*10**(-12)))
+        k=k+1
+        ccfr=0 #correct counts for QBER array estimation 
+        cdfr=0  #correct counts for QBER array estimation
+
+        for d in range(len(Alice_RK_var))  :
+          if Alice_RK_var[d]==Bob_RK_var[d]:
+            ccfr=ccfr+1
+          else:
+            cdfr=cdfr+1
+
+        if len(Alice_RK_var)==0:
+          QBER_array.append("None")
+        else:
+          QBER_array.append((cdfr/len(Alice_RK_var)))
+
+        Alice_RK_var=[]
+        Bob_RK_var=[]
+
 
 
       for j in range(start_Bob_pp,stop_Bob_pp,1):
         if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=2*time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
-  #        print(results_Alice["Time"][i]-results_Bob["Time"][j], "   ",offset)
           coincident_counts=coincident_counts+1
           Alice_raw_key.append(results_Alice["Det_result"][i])
           Bob_raw_key.append(results_Bob["Det_result"][j])
+          Alice_RK_var.append(results_Alice["Det_result"][i])
+          Bob_RK_var.append(results_Bob["Det_result"][j])
+
           start_Bob_pp=j
           break
         elif  np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)> research_window:
           break
         
       
-
+    print(QBER_array)
+    print(kr_array)
     print("Total length of the raw key for the orbit", w+1, " is: ",coincident_counts )
-    key_rate=int(coincident_counts/((stop[w]-start[w])*10**(-12)))
-    average_KTR[w]=int(coincident_counts/((stop[w]-start[w])*10**(-12)))
-    print("The average key transmission rate throughout the orbit is: " ,key_rate, " Qubit/sec")
+    key_rate=coincident_counts/((stop[w]-start[w])*10**(-12))
+    average_KTR[w]=key_rate
+    print("The average key transmission rate throughout the orbit is: ", f"{key_rate:.3g}" , " Qubit/sec")
 
     correct_counts=0
     different_counts=0
@@ -759,6 +793,16 @@ def main():
       average_QBERS[w]=QBER
       print(f"The QBER is: {QBER:.3f}")
     
+
+
+  plt.figure(1)
+  plt.title("Time difference between paired photons 15")
+  #plt.hist(td_15, bins=50, color='skyblue', edgecolor='black')
+  plt.ylabel("occurrencies")
+  plt.xlabel("time difference (ns)")
+  #plt.legend()
+  plt.show()
+  plt.close()        
 
 
 
