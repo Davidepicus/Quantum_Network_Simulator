@@ -2,7 +2,7 @@
   "Detector_parameters": {
 
     "Parametro_1": "efficienza del detector, numero compreso tra 0 ed 1",
-    "det_eff" :0.5,
+    "det_eff" :0.9,
 
     "Parametro_2": "Conteggi oscuri al secondo",
     "dark_counts": 10,
@@ -11,7 +11,7 @@
     "count_rate_max":3e18,
 
     "Parametro_4": "risoluzione temporale dei detector in picosecondi",
-    "time_resolution": 5000,
+    "time_resolution": 500,
 
     "Parametro_5": "Efficienza dei polarizing beam splitter, numero compreso tra zero ed 1",
     "PBS_efficiency": 1,
@@ -27,24 +27,13 @@
     "emitter_frequency": 60e1,
 
     "Parametro_2": "Numero medio di coppie di fotoni emesse per ogni stimolazione1",
-    "av_ph_emitted": 0.1
+    "av_ph_emitted": 0.4
 
 
   },
 
 
  "channel_parameters": {
-    "Parametro_1": "Distanza Charlie Alice in metri",
-    "d_CA": 20e3,
-
-    "Parametro_2": "Distanza Charlie Bob in metri",
-    "d_CB": 15e3,
-
-    "Parametro_3": "Attenuazione canale Charlie Alice in db/m ",
-    "att_CA": 0.00035,
-
-    "Parametro_4": "Attenuazione canale Charlie Bob in db/m ",
-    "att_CB": 0.00035,
 
     "Parametro_5": "Velocità della luce nel mezzo, espressa come frazione della velocità della luce",
     "light_speed": 1
@@ -54,6 +43,6 @@
 
   "general_parameters": {
     "Commento": "Tempo di simulazione in secondi",
-    "runtime" : 20000
+    "runtime" : 200000
   }
 }

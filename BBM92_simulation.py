@@ -446,10 +446,11 @@ def main():
 
 
   ###rewriting atmospheric loss in db per meter ####
+  att_factor= 1 #10**(0)
   for k in range(len(Bob_orb_dict["AtmosphericLoss_dB"])):
-    Bob_orb_dict["AtmosphericLoss_dB"][k]=0 #Bob_orb_dict["AtmosphericLoss_dB"][k]/Bob_orb_dict["Range"][k]
+    Bob_orb_dict["AtmosphericLoss_dB"][k]=(Bob_orb_dict["AtmosphericLoss_dB"][k]/Bob_orb_dict["Range"][k])*att_factor
   for k in range(len(Alice_orb_dict["AtmosphericLoss_dB"])):
-    Alice_orb_dict["AtmosphericLoss_dB"][k]=0 #Alice_orb_dict["AtmosphericLoss_dB"][k]/Alice_orb_dict["Range"][k]
+    Alice_orb_dict["AtmosphericLoss_dB"][k]=(Alice_orb_dict["AtmosphericLoss_dB"][k]/Alice_orb_dict["Range"][k])*att_factor
 
 
   ############# getting parameters from the json file ######################
@@ -635,8 +636,8 @@ def main():
   Alice_raw_key=[]
   Bob_raw_key=[]
 
-  print(" \nThe number of measurement performed by alice is: ", n_Alice_measurements)
-  print("The number of measurement performed by bob is: ", n_Bob_measurements)
+#  print(" \nThe number of measurement performed by alice is: ", n_Alice_measurements)
+#  print("The number of measurement performed by bob is: ", n_Bob_measurements)
 
   ##### Finding all the time offsets ####
 
@@ -648,26 +649,30 @@ def main():
     if Alice_orb_dict["SecondsFromStart"][a]<=time_for_off and Bob_orb_dict["SecondsFromStart"][b]<=time_for_off:
       offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
       offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)) ###converting only the offsets in picosecond
-#      print(Bob_orb_dict["Time"][b])
       a=a+1
       b=b+1
     elif Alice_orb_dict["SecondsFromStart"][a]<=time_for_off:
       offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
       offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)) ###converting only the offsets in picoseconds
-#      print(Alice_orb_dict["Time"][a])
       a=a+1
     elif Bob_orb_dict["SecondsFromStart"][b]<=time_for_off:
       offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
       offsets["Update_time"].append(Bob_orb_dict["SecondsFromStart"][b]*10**(12)) ###converting only the offsets in picoseconds
-#      print(Bob_orb_dict["Time"][b])
       b=b+1
     time_for_off=time_for_off+0.1
 
-#  print(offsets["Update_time"])
+
+  ### Defining parameters and arrays for the plots and post processing ####
+  research_window=2000*10**(12)
   average_QBERS=np.zeros(int(len(start)))
   average_KTR=np.zeros(int(len(start)))
+  upd_time_array = [[] for _ in range(len(start))]
+  QBER_array=[[] for _ in range(len(start))]
+  KR_array=[[] for _ in range(len(start))]
+  init_Alice=0
+  init_Bob=0
 
-
+  ##### post processing each orbit ####
   for w in range(len(start)):
     print("\n Post processing orbit ", w+1)
     coincident_counts=0
@@ -675,42 +680,43 @@ def main():
     Bob_raw_key=[]
     Alice_RK_var=[]
     Bob_RK_var=[]
-    kr_array=[]
-    QBER_array=[]
     start_Alice_pp=0
     start_Bob_pp=0
     stop_Alice_pp=0
     stop_Bob_pp=0
     k=0
     offset=0
-    research_window=100*10**(12)
     
     ### finding the first measurement of alice which is inside the window ## 
-    for a in range(len(results_Alice["Time"])):
+    for a in range(init_Alice,len(results_Alice["Time"]),1):
       if results_Alice["Time"][a]>=start[w]:
         start_Alice_pp=a
+        init_Alice=a
         break
 
     ### finding the last measurement of alice which is inside the window ## 
-    for a in range(len(results_Alice["Time"])):
+    for a in range(init_Alice, len(results_Alice["Time"]),1):
       if results_Alice["Time"][a]>=stop[w]:
         stop_Alice_pp=a
+        init_Alice=a
         break
       else:
         stop_Alice_pp=len(results_Alice["Time"])
 
 
     ### finding the first measurement of bob which is inside the window ## 
-    for b in range(len(results_Bob["Time"])):
+    for b in range(init_Bob,len(results_Bob["Time"]),1):
       if results_Bob["Time"][b]>=start[w]:
         start_Bob_pp=b
+        init_Bob=b
         break
 
 
     ### finding the last measurement of Bob which is inside the window ## 
-    for b in range(len(results_Bob["Time"])):
+    for b in range(init_Bob,len(results_Bob["Time"]),1):
       if results_Bob["Time"][b]>=stop[w]:
         stop_Bob_pp=b
+        init_Bob=b
         break
       else:
         stop_Bob_pp=len(results_Bob["Time"])
@@ -725,33 +731,38 @@ def main():
     if offset==0:
       print("Problem with individuation of the offset")
 
+
+#    print("Last window length is",(results_Bob["Time"][stop_Bob_pp]- stop[w])*10**(-12))
     #### recovering the coincident measurements #####
     for i in range (start_Alice_pp, stop_Alice_pp, 1):
-#      if k<len(offsets["Update_time"]):
+
       #### updating offset and calculating QBER and key rate for that offset###
-      if offsets["Update_time"][k]<=results_Alice["Time"][i] and k<len(offsets["Update_time"]):
-        offset=offsets["Distance"][k-1]
-        if (offsets["Update_time"][k]-offsets["Update_time"][k-1])==0:
-          print("Problem with kr at: ", offsets["Update_time"][k], "   " ,offsets["Update_time"][k-1])
-        else:
-          kr_array.append(len(Alice_RK_var)/((offsets["Update_time"][k]-offsets["Update_time"][k-1])*10**(-12)))
-        k=k+1
-        ccfr=0 #correct counts for QBER array estimation 
-        cdfr=0  #correct counts for QBER array estimation
-
-        for d in range(len(Alice_RK_var))  :
-          if Alice_RK_var[d]==Bob_RK_var[d]:
-            ccfr=ccfr+1
+      if k<len(offsets["Update_time"]):
+        if offsets["Update_time"][k]<=results_Alice["Time"][i]:
+          offset=offsets["Distance"][k-1]
+          upd_time_array[w].append(offsets["Update_time"][k])
+          if (offsets["Update_time"][k]-offsets["Update_time"][k-1])==0:
+            print("Problem with kr at: ", offsets["Update_time"][k], "   " ,offsets["Update_time"][k-1])
           else:
-            cdfr=cdfr+1
+            KR_array[w].append(len(Alice_RK_var)/((offsets["Update_time"][k]-offsets["Update_time"][k-1])*10**(-12)))
+          k=k+1
+          ccfr=0 #correct counts for QBER array estimation 
+          cdfr=0  #correct counts for QBER array estimation
 
-        if len(Alice_RK_var)==0:
-          QBER_array.append("None")
-        else:
-          QBER_array.append((cdfr/len(Alice_RK_var)))
+          
+          for d in range(len(Alice_RK_var))  :
+            if Alice_RK_var[d]==Bob_RK_var[d]:
+              ccfr=ccfr+1
+            else:
+              cdfr=cdfr+1
 
-        Alice_RK_var=[]
-        Bob_RK_var=[]
+          if len(Alice_RK_var)==0:
+            QBER_array[w].append("None")
+          else:
+            QBER_array[w].append((cdfr/len(Alice_RK_var)))
+
+          Alice_RK_var=[]
+          Bob_RK_var=[]
 
 
 
@@ -769,8 +780,9 @@ def main():
           break
         
       
-    print(QBER_array)
-    print(kr_array)
+#    print(QBER_array[w])
+#    print(KR_array[w])
+#    print(upd_time_array[w])
     print("Total length of the raw key for the orbit", w+1, " is: ",coincident_counts )
     key_rate=coincident_counts/((stop[w]-start[w])*10**(-12))
     average_KTR[w]=key_rate
@@ -786,25 +798,53 @@ def main():
 
     if coincident_counts==0:
       QBER="None"
-      average_QBERS[w]=QBER
+#      average_QBERS[w]=QBER
       print("No coincident counts have been detected for the orbit ",w+1, ", therefore QBER cannot be estimated")
     else:
       QBER=(different_counts/coincident_counts)
       average_QBERS[w]=QBER
-      print(f"The QBER is: {QBER:.3f}")
+      print(f"The average QBER of the orbit is: {QBER:.3f}")
     
+  ### rescaling time from the start of the orbit and reprocessing ###
+  for w in range(len(start)):
+    resc_fact=min(upd_time_array[w])
+    for l in range(len(upd_time_array[w])):
+      upd_time_array[w][l]=(upd_time_array[w][l]- resc_fact)*10**(-12)
+      if (QBER_array[w][l]=="None"):
+        QBER_array[w][l]=0.5
 
 
+  ### plotting the change in QBER for each orbit #### 
   plt.figure(1)
-  plt.title("Time difference between paired photons 15")
-  #plt.hist(td_15, bins=50, color='skyblue', edgecolor='black')
-  plt.ylabel("occurrencies")
-  plt.xlabel("time difference (ns)")
-  #plt.legend()
+  plt.title("QBER along each orbit")
+  for w in range(len(start)):
+    QBER_array[w]=QBER_array[w][1:]
+    upd_time_array[w]=upd_time_array[w][1:]
+    n_win=w+1
+    plt.plot(upd_time_array[w],QBER_array[w],marker='o', markersize=8, label=f"Window {n_win}")
+    
+  plt.ylabel("QBER")
+  plt.xlabel("Time since start of the orbit (s)")
+  plt.legend()
+  plt.savefig("Grafico_QBER.png", dpi=300)
   plt.show()
   plt.close()        
 
 
+  ### plotting the change in Key_rate for each orbit ####
+  plt.figure(2)
+  plt.title("Key transmission rate along each orbit")
+  for w in range(len(start)):
+    KR_array[w]=KR_array[w][1:]   
+    n_win=w+1
+    plt.plot(upd_time_array[w],KR_array[w],marker='o', markersize=8, label=f"Window {n_win}")
+    
+  plt.ylabel("Key transmission rate (bits/s)")
+  plt.xlabel("Time since start of the orbit (s)")
+  plt.legend()
+  plt.savefig("Grafico_Key_Rate.png", dpi=300)
+  plt.show()
+  plt.close()        
 
     
 
