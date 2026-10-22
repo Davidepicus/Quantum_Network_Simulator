@@ -2,22 +2,22 @@
   "Detector_parameters": {
 
     "Parametro_1": "efficienza del detector, numero compreso tra 0 ed 1",
-    "det_eff" :1,
+    "det_eff" :50,
 
     "Parametro_2": "Conteggi oscuri al secondo",
-    "dark_counts": 0,
+    "dark_counts": 5,
 
     "Parametro_3": "Conteggi massimi al picosecondo (l'inverso del dead time del detector)",
     "count_rate_max":3e18,
 
     "Parametro_4": "risoluzione temporale dei detector in picosecondi",
-    "time_resolution": 5,
+    "time_resolution": 500,
 
     "Parametro_5": "Efficienza dei polarizing beam splitter, numero compreso tra zero ed 1",
-    "PBS_efficiency": 1,
+    "PBS_efficiency": 0.99,
 
     "Parametro_6": "Efficienza dei 50/50 beam splitter, numero compreso tra zero ed 1",
-    "Beam_splitter_efficiency": 1
+    "Beam_splitter_efficiency": 0.99
 
 
   },
@@ -27,7 +27,7 @@
     "emitter_frequency": 600,
 
     "Parametro_2": "Numero medio di coppie di fotoni emesse per ogni stimolazione1",
-    "av_ph_emitted": 0.4
+    "av_ph_emitted": 0.1
 
 
   },

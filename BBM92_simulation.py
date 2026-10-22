@@ -398,7 +398,7 @@ def main():
   Reg_Alice=Register("BBM92_Reg_Alice")
   Reg_Bob=Register("BBM92_Reg_Bob")
 
-
+  """
   ##### importing orbits ###########
   # Carica i CSV
   df_lijiang = pd.read_csv("fucino_satellite.csv")
@@ -453,17 +453,67 @@ def main():
   Alice_orb_dict = df_lijiang.to_dict(orient="list")
   Bob_orb_dict = df_delingha.to_dict(orient="list")
 
-  print(df_delingha.head(5))
-  print(df_delingha["Time"].iloc[0])
-  print(df_delingha["Time"].iloc[1])
+#  print(df_delingha.head(5))
+#  print(df_delingha["Time"].iloc[0])
+#  print(df_delingha["Time"].iloc[1])
 
   ### rewriting the ranges in meters instead of kilometers ################
   Alice_orb_dict["Range"]=Alice_orb_dict["Range"]*10**(3)
   Alice_orb_dict["Range"]=Alice_orb_dict["Range"]*10**(3)
+  """
+
+  # Carica i CSV
+  df_lijiang = pd.read_csv("lario_satellite.csv")
+  df_delingha = pd.read_csv("fucino_satellite.csv")
+
+  df_lijiang["Source"] = "Lijiang"
+  df_delingha["Source"] = "Delingha"
+
+  # Unisci per calcolare il tempo globale
+  df_all = pd.concat([df_lijiang, df_delingha], ignore_index=True)
+
+  def to_datetime(row):
+      return datetime.strptime(
+          row["Date"] + " " + row["Time"],
+          "%d %b %Y %H:%M:%S.%f"
+      )
+
+  df_all["Datetime"] = df_all.apply(to_datetime, axis=1)
+
+  t0 = df_all["Datetime"].min()
+  df_all["SecondsFromStart"] = (df_all["Datetime"] - t0).dt.total_seconds()
+
+  # Ora ri-separa, SENZA altri merge
+  df_lijiang = df_all[df_all["Source"] == "Lijiang"].copy()
+  df_delingha = df_all[df_all["Source"] == "Delingha"].copy()
+
+  def atmospheric_attenuation_1550(elev_deg, alpha0_db=0.1):
+      elev_rad = np.deg2rad(np.abs(elev_deg))
+      airmass = 1.0 / np.sin(elev_rad)
+      return alpha0_db * airmass
+
+  df_lijiang["AtmosphericLoss_dB"] = df_lijiang["Elevation"].apply(atmospheric_attenuation_1550)
+  df_delingha["AtmosphericLoss_dB"] = df_delingha["Elevation"].apply(atmospheric_attenuation_1550)
+
+  Alice_orb_dict = df_lijiang.to_dict(orient="list")
+  Bob_orb_dict   = df_delingha.to_dict(orient="list")
+
+  Alice_orb_dict["Range"] = np.array(Alice_orb_dict["Range"]) * 10**3
+  Bob_orb_dict["Range"]   = np.array(Bob_orb_dict["Range"])   * 10**3
+
+
+
+
+
+
+
+
+
+
 
 
   ###rewriting atmospheric loss in db per meter ####
-  att_factor= 0 #10**(0)
+  att_factor= 1 #10**(0)
   for k in range(len(Bob_orb_dict["AtmosphericLoss_dB"])):
     Bob_orb_dict["AtmosphericLoss_dB"][k]=(Bob_orb_dict["AtmosphericLoss_dB"][k]/Bob_orb_dict["Range"][k])*att_factor
   for k in range(len(Alice_orb_dict["AtmosphericLoss_dB"])):
@@ -507,7 +557,7 @@ def main():
 
   start=[] #times in seconds at which the emitter should start emitting as the satellite can see both of the receivers
   stop=[] #times in seconds at which the emitter should stop emitting as the satellite cannot see at least one of the receivers
-  start.append(max(Alice_orb_dict["SecondsFromStart"][0], Alice_orb_dict["SecondsFromStart"][0])) #instant of coincident visibility
+  start.append(max(Alice_orb_dict["SecondsFromStart"][0], Bob_orb_dict["SecondsFromStart"][0])) #instant of coincident visibility
   start_date=[] #times in date format at which the emitter should start emitting as the satellite can see both of the receivers
   stop_date=[] #times in date format at which the emitter should stop emitting as the satellite cannot see at least one of the receivers
   start_date.append(max(Alice_orb_dict["Time"][0], Alice_orb_dict["Time"][0])) #instant of coincident visibility
@@ -656,11 +706,12 @@ def main():
   time_for_off=0
   a=0
   b=0
-  print(len(Alice_orb_dict["SecondsFromStart"]),len(Bob_orb_dict["SecondsFromStart"]) )
+#  print(len(Alice_orb_dict["SecondsFromStart"]),len(Bob_orb_dict["SecondsFromStart"]) )
   while time_for_off<=sim_time and a<len(Alice_orb_dict["SecondsFromStart"]) and b<len(Bob_orb_dict["SecondsFromStart"]):
 #    print(Alice_orb_dict["SecondsFromStart"][a], "   ", Bob_orb_dict["SecondsFromStart"][b], a, "   ", b)
     if Alice_orb_dict["SecondsFromStart"][a]<=time_for_off and Bob_orb_dict["SecondsFromStart"][b]<=time_for_off:
       offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
+#      print( Alice_orb_dict["Range"][a], "  ", Bob_orb_dict["Range"][b])
       offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)) ###converting only the offsets in picosecond
       a=a+1
       b=b+1
@@ -684,13 +735,14 @@ def main():
 
 
 #  for p in range(30):
-#    print(results_Alice["Time"][p]*10**(-12))
+#    print(results_Alice["Time"][p]*10**(-12)- results_Bob["Time"][p]*10**(-12), results_Alice["Time"][p]*10**(-12))
+
 
 #  for l in range(len(offsets["Update_time"])):
 #    print(offsets["Update_time"][l]*10**(-12), "   ", offsets["Distance"][l])
 
   ### Defining parameters and arrays for the plots and post processing ####
-  research_window=10**(200)
+  research_window=10**(20)
   average_QBERS=np.zeros(int(len(start)))
   average_KTR=np.zeros(int(len(start)))
   upd_time_array = [[] for _ in range(len(start))]
@@ -756,13 +808,13 @@ def main():
     for h in range(len(offsets["Distance"])-1):
       if offsets["Update_time"][h]<=start[w] and  offsets["Update_time"][h+1]>=start[w] :
         offset=offsets["Distance"][h]
-        k=h+1
+        k=h+2
         break
     if offset==0:
       print("Problem with individuation of the offset")
 
 
-#    print("Last window length is",(results_Bob["Time"][stop_Bob_pp]- stop[w])*10**(-12))
+
     #### recovering the coincident measurements #####
     for i in range (start_Alice_pp, stop_Alice_pp, 1):
 
@@ -770,7 +822,7 @@ def main():
       if k<len(offsets["Update_time"]):
         if offsets["Update_time"][k]<=results_Alice["Time"][i]:
 #          print(k, "   ", len(offsets["Update_time"]) )
-          offset=offsets["Distance"][k-1]
+          offset=offsets["Distance"][k]
           upd_time_array[w].append(offsets["Update_time"][k])
           if (offsets["Update_time"][k]-offsets["Update_time"][k-1])==0:
             print("Problem with kr at: ", offsets["Update_time"][k], "   " ,offsets["Update_time"][k-1])
@@ -799,7 +851,8 @@ def main():
 
       for j in range(start_Bob_pp,stop_Bob_pp,1):
 
-        if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=2*time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:      
+        if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=2*time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
+#          print(results_Alice["Time"][i], "   ", offsets["Update_time"][k])
           coincident_counts=coincident_counts+1
           Alice_raw_key.append(results_Alice["Det_result"][i])
           Bob_raw_key.append(results_Bob["Det_result"][j])
