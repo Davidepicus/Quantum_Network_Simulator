@@ -471,7 +471,7 @@ def main():
 
   # Unisci per calcolare il tempo globale
   df_all = pd.concat([df_lijiang, df_delingha], ignore_index=True)
-
+  print(df_all.columns)
   def to_datetime(row):
       return datetime.strptime(
           row["Date"] + " " + row["Time"],
@@ -712,18 +712,18 @@ def main():
     if Alice_orb_dict["SecondsFromStart"][a]<=time_for_off and Bob_orb_dict["SecondsFromStart"][b]<=time_for_off:
       offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
 #      print( Alice_orb_dict["Range"][a], "  ", Bob_orb_dict["Range"][b])
-      offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)) ###converting only the offsets in picosecond
+      offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)+(Alice_orb_dict["Range"][a]/LS)) ### calculating the offsets in picosecond
       a=a+1
       b=b+1
 #      print("AAAAAA both orbits changed at the same time ")
     if Alice_orb_dict["SecondsFromStart"][a]<=time_for_off:
       offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
-      offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)) ###converting only the offsets in picoseconds
+      offsets["Update_time"].append(Alice_orb_dict["SecondsFromStart"][a]*10**(12)+(Alice_orb_dict["Range"][a]/LS)) ###converting only the offsets in picoseconds
       a=a+1
 #      print("AAAAAA Alice orbits changed first ")
     if Bob_orb_dict["SecondsFromStart"][b]<=time_for_off:
       offsets["Distance"].append((Alice_orb_dict["Range"][a]-Bob_orb_dict["Range"][b])/LS)
-      offsets["Update_time"].append(Bob_orb_dict["SecondsFromStart"][b]*10**(12)) ###converting only the offsets in picoseconds
+      offsets["Update_time"].append(Bob_orb_dict["SecondsFromStart"][b]*10**(12)+(Alice_orb_dict["Range"][a]/LS)) ###converting only the offsets in picoseconds
       b=b+1
 #      print("AAAAAA Bob orbits changed first ")
     time_for_off=time_for_off+0.01
@@ -806,9 +806,9 @@ def main():
 
     #### finding the offset at start time ###
     for h in range(len(offsets["Distance"])-1):
-      if offsets["Update_time"][h]<=start[w] and  offsets["Update_time"][h+1]>=start[w] :
+      if offsets["Update_time"][h]<=results_Alice["Time"][start_Alice_pp] and  offsets["Update_time"][h+1]>=results_Alice["Time"][start_Alice_pp]:  #start[w] and  offsets["Update_time"][h+1]>=start[w] :
         offset=offsets["Distance"][h]
-        k=h+2
+        k=h+1
         break
     if offset==0:
       print("Problem with individuation of the offset")
@@ -920,7 +920,7 @@ def main():
   plt.figure(2)
   plt.title("Key transmission rate along each orbit")
   for w in range(len(start)):
-    KR_array[w]=KR_array[w][1:]   
+    KR_array[w]=KR_array[w][1:]  
     n_win=w+1
     plt.plot(upd_time_array[w],KR_array[w],marker='o', markersize=8, label=f"Window {n_win}")
     

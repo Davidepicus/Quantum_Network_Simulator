@@ -2,7 +2,7 @@
   "Detector_parameters": {
 
     "Parametro_1": "efficienza del detector, numero compreso tra 0 ed 1",
-    "det_eff" :50,
+    "det_eff" :0.9,
 
     "Parametro_2": "Conteggi oscuri al secondo",
     "dark_counts": 5,
@@ -43,6 +43,6 @@
 
   "general_parameters": {
     "Commento": "Tempo di simulazione in secondi",
-    "runtime" : 200
+    "runtime" : 20000
   }
 }
