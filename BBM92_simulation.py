@@ -463,8 +463,8 @@ def main():
   """
 
   # Carica i CSV
-  df_lijiang = pd.read_csv("lario_satellite.csv")
-  df_delingha = pd.read_csv("fucino_satellite.csv")
+  df_lijiang = pd.read_csv("fucino_satellite.csv")
+  df_delingha = pd.read_csv("lario_satellite.csv")
 
   df_lijiang["Source"] = "Lijiang"
   df_delingha["Source"] = "Delingha"
@@ -560,12 +560,12 @@ def main():
   start.append(max(Alice_orb_dict["SecondsFromStart"][0], Bob_orb_dict["SecondsFromStart"][0])) #instant of coincident visibility
   start_date=[] #times in date format at which the emitter should start emitting as the satellite can see both of the receivers
   stop_date=[] #times in date format at which the emitter should stop emitting as the satellite cannot see at least one of the receivers
-  start_date.append(max(Alice_orb_dict["Time"][0], Alice_orb_dict["Time"][0])) #instant of coincident visibility
+  start_date.append(max(Alice_orb_dict["Time"][0], Bob_orb_dict["Time"][0])) #instant of coincident visibility
 
 
   #### cheching when the orbits start or stop ####
   max_silence_time=1200 ##maximum silence time of the updating of the orbits in seconds, it needs to be bigger than the orbit time 
-  t=0
+  t=start[0]
   i=0
   j=0
   limiter="None"
@@ -576,7 +576,7 @@ def main():
   if sim_time> max(Alice_orb_dict["SecondsFromStart"]):
     print("Simulation time has been reset to: ", max(Alice_orb_dict["SecondsFromStart"]), " seconds, as it exceeds the simulation time of the orbits" )
     sim_time=max(Alice_orb_dict["SecondsFromStart"])
-  elif sim_time> max(Bob_orb_dict["SecondsFromStart"]):
+  if sim_time> max(Bob_orb_dict["SecondsFromStart"]):
     print("Simulation time has been reset to: ", max(Bob_orb_dict["SecondsFromStart"]), " seconds as it exceeds the simulation time of the orbits" )
     sim_time=max(Bob_orb_dict["SecondsFromStart"])
 
@@ -641,7 +641,7 @@ def main():
       emission_windows.append(stop[i]-start[i])
       print ("Window ", i+1, " from ", start_date[i] , " to ", stop_date[i], " of duration ", f"{emission_windows[i]:.1f}", "seconds \n")
   else:
-    print("Error in window estimation ")
+    print("Error in window estimation " )
 
 
 
@@ -757,6 +757,7 @@ def main():
   ##### post processing each orbit ####
   for w in range(len(start)):
     print("\n Post processing orbit ", w+1)
+    #resetting every parameter for this orbit
     coincident_counts=0
     Alice_raw_key=[]
     Bob_raw_key=[]
@@ -778,7 +779,7 @@ def main():
 
     ### finding the last measurement of alice which is inside the window ## 
     for a in range(init_Alice, len(results_Alice["Time"]),1):
-      if results_Alice["Time"][a]>=stop[w]:
+      if results_Alice["Time"][a]>=stop[w]+5000000:
         stop_Alice_pp=a
         init_Alice=a
         break
@@ -788,7 +789,7 @@ def main():
 
     ### finding the first measurement of bob which is inside the window ## 
     for b in range(init_Bob,len(results_Bob["Time"]),1):
-      if results_Bob["Time"][b]>=start[w]:
+      if results_Bob["Time"][b]>=start[w]+5000000:
         start_Bob_pp=b
         init_Bob=b
         break
@@ -806,7 +807,8 @@ def main():
 
     #### finding the offset at start time ###
     for h in range(len(offsets["Distance"])-1):
-      if offsets["Update_time"][h]<=results_Alice["Time"][start_Alice_pp] and  offsets["Update_time"][h+1]>=results_Alice["Time"][start_Alice_pp]:  #start[w] and  offsets["Update_time"][h+1]>=start[w] :
+      if offsets["Update_time"][h]<=results_Alice["Time"][start_Alice_pp] and  offsets["Update_time"][h+1]>=results_Alice["Time"][start_Alice_pp]: 
+#        print("offset updated at: ", offsets["Update_time"][h] ) 
         offset=offsets["Distance"][h]
         k=h+1
         break
