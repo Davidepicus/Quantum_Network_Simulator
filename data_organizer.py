@@ -2,7 +2,7 @@ import re
 import pandas as pd
 
 # 1. Leggi il file
-with open("Fucino_Lario_Sat_AER.txt", "r", encoding="utf-8") as f:
+with open("Fucino_Lario_Sat_AER_tagliate.txt", "r", encoding="utf-8") as f:
     text = f.read()
 
 # 2. Dividi in due blocchi usando le intestazioni reali del file

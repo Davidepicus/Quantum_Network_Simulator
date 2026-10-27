@@ -779,7 +779,7 @@ def main():
 
     ### finding the last measurement of alice which is inside the window ## 
     for a in range(init_Alice, len(results_Alice["Time"]),1):
-      if results_Alice["Time"][a]>=stop[w]+5000000:
+      if results_Alice["Time"][a]>=stop[w]:
         stop_Alice_pp=a
         init_Alice=a
         break
@@ -789,7 +789,7 @@ def main():
 
     ### finding the first measurement of bob which is inside the window ## 
     for b in range(init_Bob,len(results_Bob["Time"]),1):
-      if results_Bob["Time"][b]>=start[w]+5000000:
+      if results_Bob["Time"][b]>=start[w]:
         start_Bob_pp=b
         init_Bob=b
         break
@@ -924,7 +924,7 @@ def main():
   for w in range(len(start)):
     KR_array[w]=KR_array[w][1:]  
     n_win=w+1
-    plt.plot(upd_time_array[w],KR_array[w],marker='o', markersize=8, label=f"Window {n_win}")
+    plt.plot(upd_time_array[w],KR_array[w],marker='o', markersize=8,label=f"Window {n_win}")
     
   plt.ylabel("Key transmission rate (bits/s)")
   plt.xlabel("Time since start of the orbit (s)")
