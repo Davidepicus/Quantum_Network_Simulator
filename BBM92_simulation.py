@@ -118,20 +118,6 @@ class Qchannel(optch.QuantumChannel):
 
 
 
-  def reset_distance(self, dist=-1):
-    if dist<0:
-      print("Error, distance value is invalid, distance has not been changed")
-    else:
-      self.distance=dist
-
-
-  def reset_absorption(self, absor=-1):
-    if absor<0:
-      print("Error, absorption value is invalid, absorption has not been changed")
-    else:
-      self.attenuation=absor
-
-
 
 
 ################ redefining correct Polarizing beam splitter class ###########################
@@ -471,7 +457,7 @@ def main():
 
   # Unisci per calcolare il tempo globale
   df_all = pd.concat([df_lijiang, df_delingha], ignore_index=True)
-  print(df_all.columns)
+#  print(df_all.columns)
   def to_datetime(row):
       return datetime.strptime(
           row["Date"] + " " + row["Time"],
