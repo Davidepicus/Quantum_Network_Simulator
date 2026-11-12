@@ -225,7 +225,7 @@ class Qchannel(optch.QuantumChannel):
 
             # check if polarization encoding and apply necessary noise
             if photon.encoding_type["name"] == "polarization" and self.sender.get_generator().random() > self.polarization_fidelity:
-                print("phass")
+#                print("phass")
                 photon.random_noise(self.get_generator())
             
             # schedule receiving node to receive photon at future time determined by light speed
@@ -397,22 +397,39 @@ class BB84_receiver(nd.Node):
 
 def main():
 
+  with open('vonfig.json', 'r', encoding='utf-8') as file:
+    parameters= json.load(file)
+
 
 #### Parameters settings ############
 
-  emission_frequency=80000*10**(-12) ###in numbers of emission per picoseconds
-  average_photons_emitted=0.1
-  detector_efficiency=1
-  dark_counts=0
-  count_rate_max=8*10**(33)
-  time_resolution=5
-  PBS_eff=1
-  BS_eff=1
-  runtime=2*10**(11)
+  runtime =parameters["general_parameters"]["runtime"]*(10)**(12)
+  emission_frequency=parameters["emitter_parameters"]["emitter_frequency"]*10**(-12) ###in numbers of emission per picoseconds
+  average_photons_emitted=parameters["emitter_parameters"]["av_ph_emitted"]
+  detector_efficiency=parameters["Detector_parameters"]["det_eff"]
+  dark_counts=parameters["Detector_parameters"]["dark_counts"]
+  count_rate_max=parameters["Detector_parameters"]["count_rate_max"]
+  time_resolution=parameters["Detector_parameters"]["time_resolution"]
+  PBS_eff=parameters["Detector_parameters"]["PBS_efficiency"]
+  BS_eff=parameters["Detector_parameters"]["Beam_splitter_efficiency"]
+  LS=constants.speed_of_light*parameters["channel_parameters"]["light_speed"]*10**(-12)
+  pol_fidelity=parameters["channel_parameters"]["Polarization_error"]
+
+
+#  emission_frequency=80000*10**(-12) ###in numbers of emission per picoseconds
+#  average_photons_emitted=0.01
+#  detector_efficiency=0.5
+#  dark_counts=500
+#  count_rate_max=8*10**(33)
+#  time_resolution=5
+#  PBS_eff=0.99
+#  BS_eff=0.99
+#  runtime=2*10**(13)
   distance_AB= 2*10**(3)
-  ch_attenuationAB=0
-  LS=constants.speed_of_light*10**(-12)
+  ch_attenuationAB=0.002
+#  LS=constants.speed_of_light*10**(-12)
   phase_error=0
+#  pol_fidelity=0.96
 
 ##### Defining timeline ################
   tl = Timeline(runtime)
@@ -425,7 +442,7 @@ def main():
 
 
 #### Defining nodes, Alice (the sender), Bob (the receiver), and quantum channels ################
-  qc0 = Qchannel("qc0", tl, distance=distance_AB, polarization_fidelity=1, attenuation=ch_attenuationAB,light_speed=LS)
+  qc0 = Qchannel("qc0", tl, distance=distance_AB, polarization_fidelity=pol_fidelity, attenuation=ch_attenuationAB,light_speed=LS)
   Alice = BB84_laser_source(name="Alice", tl=tl, receiver=qc0, av_photons=average_photons_emitted, phase_err=phase_error, reg=Reg_Alice)
   Bob = BB84_receiver(name="Bob",  tl=tl,det_eff=detector_efficiency, dark_counts=dark_counts ,count_rate_max=count_rate_max ,time_resolution=time_resolution, reg=Reg_Bob,PBS_efficiency=PBS_eff, BS_efficiency=BS_eff)
   qc0.connect(Alice,Bob)
@@ -466,8 +483,8 @@ def main():
   print("Number of Bob detections is: ",n_Bob_measurements )
 
 
-#  print(results_Alice["Time"][:30])
-#  print(results_Bob["Time"][:30])
+#  print(results_Alice["Basis"][:30])
+#  print(results_Bob["Basis"][:30])
 #  print(offset)
 
   print("\n","### Starting to post processing analysis ###")
@@ -477,13 +494,13 @@ def main():
   for i in range (n_Alice_measurements): 
     for j in range(start,n_Bob_measurements,1):
 #      print(results_Alice["Time"][i], results_Bob["Time"][j])
-      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)<=time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
+      if np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]+offset)<=3*time_resolution and results_Alice["Basis"][i]==results_Bob["Basis"][j]:
         coincident_counts=coincident_counts+1
         Alice_raw_key.append(results_Alice["Det_result"][i])
         Bob_raw_key.append(results_Bob["Det_result"][j])
         start=j
         break
-      elif np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)> 100000000000000000000000000000*time_resolution:
+      elif np.abs(results_Alice["Time"][i]-results_Bob["Time"][j]-offset)> time_resolution*10**(10):
         break
       
     
